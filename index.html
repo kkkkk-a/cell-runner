@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>セルランナー</title>
+    <link rel="icon" type="image/png" href="favicon.ico">
     <style>
         html,
         body {
@@ -684,19 +685,19 @@
 
 
         /* --- キャラクタースロット --- */
-        #char-slots {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            bottom: 10px; /* ★★★ 下からの位置を調整 ★★★ */
-            /* gapは親の.control-groupから継承される */
-        }
+#char-slots {
+    position: absolute;
+    bottom: 0; /* ゲーム画面の下から10pxの位置に */
+    left: 4px;
+    pointer-events: auto; /* ★★★ クリックできるように必ず指定 ★★★ */
+    z-index: 10; /* 他のUIより手前に */
+}
 
         .char-slot {
            width: clamp(30px, 8vw, 50px);
             height: clamp(30px, 8vw, 50px);
             font-size: clamp(18px, 7vw, 36px);
-            background-color: rgba(255, 255, 255, 1);
+            background-color: rgba(255, 255, 255, 0.4);
             border: 2px solid rgba(255, 255, 255, 0.6);
             border-radius: 8px;
             color: white;
@@ -802,18 +803,20 @@
                     <a id="tweet-link" href="#" target="_blank" class="tweet-button">スコアをツイート Ⓧ</a>
                 </div>
 
-
+                            <div id="char-slots" class="control-group">
+                    <div class="char-slot" id="slot-1">1</div>
+                    <div class="char-slot" id="slot-2">2</div>
+                    <div class="char-slot" id="slot-3">3</div>
+                </div>
             </div>
+
+
                 <div id="mobile-controls">
                     <div class="control-group">
                         <div class="control-btn" id="btn-left">◀</div>
                         <div class="control-btn" id="btn-right">▶</div>
                     </div>
-                    <div id="char-slots" class="control-group">
-                        <div class="char-slot" id="slot-1">1</div>
-                        <div class="char-slot" id="slot-2">2</div>
-                        <div class="char-slot" id="slot-3">3</div>
-                    </div>
+
                     <div class="control-group">
                         <div class="control-btn" id="btn-action">◎</div>
                         <div class="control-btn" id="btn-jump">▲</div>
@@ -1277,7 +1280,7 @@ function initPixelEditor() {
             document.getElementById('bullet-speed-display').textContent = `弾速: ${projectileSpeed.toFixed(2)}`;
         }
 
-        function analyzeAndApplyImage(img, applyToPlayer = true) {
+function analyzeAndApplyImage(img, applyToPlayer = true) {
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = img.width; tempCanvas.height = img.height;
@@ -1300,16 +1303,14 @@ function initPixelEditor() {
                 }
                 if (warm > cool && warm > neutral) tendency = 'warm';
                 else if (cool > warm && cool > neutral) tendency = 'cool';
-                else tendency = 'neutral';
             } catch (e) {
                 console.warn("Could not analyze image colors. Defaulting to neutral.");
-                tendency = 'neutral';
             }
-
+            
             if (applyToPlayer) {
                 player.colorAbility = tendency;
             }
-            return tendency; // ★★★ 結果を返すように変更 ★★★
+            return tendency; // ★★★ 分析結果を文字列として返す！ ★★★
         }
 
         applyPixelArtBtn.addEventListener('click', () => {
