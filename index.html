@@ -281,15 +281,16 @@
 
         /* --- スマホ用操作ボタン --- */
         #mobile-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 30px;
-            right: 30px;
-            display: flex;
+            display: none;
+            width: 100%;
+            padding: 0 10px;
+            box-sizing: border-box;
             justify-content: space-between;
             pointer-events: auto;
             user-select: none;
             -webkit-user-select: none;
+            position: relative; /* ★★★ 子要素を配置する基準にするため追加 ★★★ */
+            min-height: 80px; /* ★★★ ボタンの高さを確保するため追加 ★★★ */
         }
 
         .control-group {
@@ -297,16 +298,18 @@
             gap: 20px;
         }
 
-        .control-btn {
-            width: 60px;
-            height: 60px;
+.control-btn {
+            /* ★★★ サイズを可変に変更 ★★★ */
+            width: clamp(25px, 10vw, 50px);
+            height: clamp(25px, 10vw, 50px);
+            font-size: clamp(18px, 4vw, 24px);
+            
             background-color: rgba(255, 255, 255, 0.5);
             border-radius: 50%;
             border: 2px solid rgba(0, 0, 0, 0.5);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 30px;
             color: white;
         }
 
@@ -532,6 +535,10 @@
                 /* ★常にゲームの比率を保つ */
             }
 
+            #mobile-controls {
+                display: flex; /* ★★★ スマホの時だけflexで表示する ★★★ */
+            }
+
             /* --- リサイズ用のJavaScriptを上書きするため --- */
             /* JSがwidth/heightをstyle属性で設定しますが、 */
             /* それを無効化してCSSで制御します */
@@ -678,21 +685,20 @@
         /* --- キャラクタースロット --- */
         #char-slots {
             position: absolute;
-            /* 中央に配置するため */
             left: 50%;
             transform: translateX(-50%);
-            bottom: -20px;
+            bottom: 10px; /* ★★★ 下からの位置を調整 ★★★ */
+            /* gapは親の.control-groupから継承される */
         }
 
         .char-slot {
-            width: 30px;
-            /* 少し小さめに */
-            height: 30px;
-            background-color: rgba(0, 0, 0, 0.1);
+           width: clamp(30px, 8vw, 50px);
+            height: clamp(30px, 8vw, 50px);
+            font-size: clamp(18px, 7vw, 36px);
+            background-color: rgba(255, 255, 255, 1);
             border: 2px solid rgba(255, 255, 255, 0.6);
             border-radius: 8px;
             color: white;
-            font-size: 18px;
             font-weight: bold;
             display: flex;
             justify-content: center;
@@ -795,6 +801,8 @@
                     <a id="tweet-link" href="#" target="_blank" class="tweet-button">スコアをツイート Ⓧ</a>
                 </div>
 
+
+            </div>
                 <div id="mobile-controls">
                     <div class="control-group">
                         <div class="control-btn" id="btn-left">◀</div>
@@ -810,8 +818,6 @@
                         <div class="control-btn" id="btn-jump">▲</div>
                     </div>
                 </div>
-            </div>
-
             <div id="legend">
 
                 <div class="legend-item">
@@ -883,7 +889,7 @@
                     <tr>
                         <th style="padding: 8px;">操作</th>
                         <th style="padding: 8px;">キーボード</th>
-                        <th style="padding: 8px;">画面ボタン</th>
+                        <th style="padding: 8px;">スマホ</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -898,7 +904,7 @@
                         <td style="padding: 8px;">▲</td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px;">アクション (射撃/浮遊)</td>
+                        <td style="padding: 8px;">アクション(射撃/浮遊)/商人と取引</td>
                         <td style="padding: 8px;">左Shift or X</td>
                         <td style="padding: 8px;">◎</td>
                     </tr>
