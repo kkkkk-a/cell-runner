@@ -1,0 +1,2812 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>セルランナー</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #34495e;
+            font-family: sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- 全体レイアウト --- */
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- 左パネル (キャラクター操作 & ドット絵工房) --- */
+        #pixel-art-editor {
+            flex: 0 0 clamp(320px, 25vw, 380px);
+            padding: 15px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            border-right: 2px solid #000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- 左パネル上部のキャラクター情報 --- */
+        .legend-header {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        #image-upload-container,
+        #stats-display {
+            flex: 1;
+        }
+
+        #stats-display {
+            margin-top: 0;
+        }
+
+        /* --- 中央パネル (ゲーム画面 & オブジェクト説明) --- */
+        .main-content {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            padding: 20px;
+            gap: 20px;
+            box-sizing: border-box;
+        }
+
+        /* --- ゲーム画面ラッパー --- */
+        .game-wrapper {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        canvas {
+            background-color: #87ceeb;
+            border: 2px solid #000;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* --- 横長オブジェクト説明 (凡例) --- */
+        #legend {
+            width: 95%;
+            max-width: 804px;
+            height: auto;
+            padding: 15px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 8px;
+            border: 2px solid #000;
+            flex-shrink: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px 15px;
+            box-sizing: border-box;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-item span {
+            font-size: clamp(12px, 0.8vw, 15px);
+        }
+
+        .legend-shape {
+            width: 30px;
+            height: 30px;
+            margin-right: 15px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+        }
+
+        /* --- 凡例内の個別コンポーネント --- */
+        #image-upload-container {
+            padding: 10px;
+            background-color: #3d566e;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        #image-upload-container label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        #player-image-upload {
+            margin-top: 5px;
+            width: 100%;
+        }
+
+        #stats-display {
+            padding-top: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* --- 共通ボタン --- */
+        .custom-btn {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+            background-color: #7f8c8d;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .custom-btn:hover {
+            background-color: #95a5a6;
+        }
+
+        /* --- 凡例のオブジェクト形状スタイル --- */
+        .shape-player {
+            background-color: #000000;
+        }
+
+        .shape-platform {
+            background-color: #27ae60;
+            height: 15px;
+        }
+
+        .shape-ice {
+            background-color: #a2e0ff;
+            border: 1px solid #74b9ff;
+            height: 13px;
+        }
+
+        .shape-fragile {
+            background-color: #e67e22;
+            height: 15px;
+        }
+
+        .shape-moving {
+            background-color: #576574;
+            height: 15px;
+        }
+
+        .shape-jump-pad {
+            background-color: #9b59b6;
+            height: 10px;
+        }
+
+        .shape-spike {
+            width: 0;
+            height: 0;
+            background-color: transparent;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 25px solid #836d48;
+        }
+
+        .shape-ground-enemy {
+            background-color: #34495e;
+            border: 1px solid #ecf0f1;
+        }
+
+        .shape-air-enemy {
+            background-color: #9b59b6;
+            border-radius: 50%;
+        }
+
+        .shape-turret {
+            background-color: #836d48;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+        }
+
+        .shape-coin {
+            background-color: #f1c40f;
+            border-radius: 50%;
+            border: 2px solid #f39c12;
+        }
+
+        .shape-ladder {
+            background-image: linear-gradient(#cd853f 2px, transparent 2px), linear-gradient(#cd853f 2px, transparent 2px), linear-gradient(to right, #cd853f 2px, transparent 2px), linear-gradient(to right, #cd853f 2px, transparent 2px);
+            background-size: 100% 10px, 100% 10px, 10px 100%, 10px 100%;
+            background-repeat: repeat-y, repeat-y, repeat-x, repeat-x;
+            background-position: 0 0, 0 100%, 0 0, 100% 0;
+            height: 28px;
+            width: 28px;
+            border: none;
+        }
+
+        .shape-merchant {
+            background-color: #DAA520;
+            /* 商人の色 */
+        }
+
+        .shape-item {
+            background-color: #4a637b;
+            border-radius: 5px;
+        }
+
+        /* --- ゲーム画面上のUI --- */
+        #game-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        #inventory {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .item-display {
+            display: flex;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .item-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+        }
+
+        /* --- スマホ用操作ボタン --- */
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 30px;
+            right: 30px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            border: 2px solid rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: white;
+        }
+
+        #btn-action {
+            font-size: 24px;
+        }
+
+        /* --- ゲームオーバー画面 --- */
+        #game-over-screen {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            color: white;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .tweet-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #1DA1F2;
+            color: white;
+            text-decoration: none;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* --- ドット絵エディタ --- */
+        #pixel-grid {
+            display: grid;
+            grid-template-columns: repeat(32, 1fr);
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            border: 1px solid #7f8c8d;
+            background-color: #ecf0f1;
+            cursor: crosshair;
+            box-sizing: border-box;
+            /* ← ★★★ これが解決策です ★★★ */
+        }
+
+        .pixel-cell {
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            box-sizing: border-box;
+        }
+
+        #color-palette {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .color-swatch {
+            width: 100%;
+            height: 25px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .color-swatch.active {
+            border-color: #f1c40f;
+            transform: scale(1.1);
+        }
+
+        /* --- 取引メニュー --- */
+        #trade-menu {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #trade-menu button {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #trade-menu button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        /* --- ビートシーケンサー --- */
+        #sequencer {
+            margin-top: 15px;
+        }
+
+        .part-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .part-label {
+            font-weight: bold;
+            width: 55px;
+            padding-right: 10px;
+            font-size: 0.5em;
+            flex-shrink: 0;
+        }
+
+        .step-buttons {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 2px;
+            width: 100%;
+        }
+
+        .step-btn {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: #576574;
+            border: 1px solid #2c3e50;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .step-btn.active {
+            background-color: #f1c40f;
+        }
+
+        .step-btn.playing {
+            box-shadow: inset 0 0 4px #fff;
+        }
+
+        .step-btn.beat {
+            border-color: #95a5a6;
+        }
+
+        #sequencer-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        #sequencer-controls .custom-btn {
+            flex-grow: 1;
+        }
+
+        #track-info {
+            font-size: 13px;
+            font-weight: bold;
+            background-color: #3d566e;
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        @media (max-width: 750px) {
+
+            /* --- ページ全体のスクロールを許可 --- */
+            html,
+            body {
+                overflow: auto;
+                /* 縦スクロールを許可 */
+                height: auto;
+                /* 高さをコンテンツに合わせる */
+            }
+
+            /* --- 全体レイアウトを縦並びに変更 --- */
+            .game-container {
+                flex-direction: column;
+                /* ★レイアウトの心臓部！縦並びに変更 */
+                height: auto;
+            }
+
+            /* --- 左パネルを画面上部に配置 --- */
+            #pixel-art-editor {
+                flex: 1 0 auto;
+                /* 高さが自動で決まるように */
+                width: 100%;
+                /* 横幅を画面いっぱいに */
+                box-sizing: border-box;
+                /* paddingを含めて幅100%にする */
+                border-right: none;
+                /* 右の境界線を消す */
+                border-bottom: 2px solid #000;
+                /* 代わりに下の境界線を追加 */
+                overflow-y: visible;
+                /* パネル自体のスクロールは不要に */
+            }
+
+            /* --- 中央パネルを画面中央に配置 --- */
+            .main-content {
+                padding: 10px;
+                /* 余白を少し詰める */
+                gap: 10px;
+            }
+
+            .game-wrapper {
+                width: 100%;
+                /* ★ゲームラッパーの幅を親要素(main-content)に合わせる */
+                height: auto;
+                /* 高さは幅に応じて自動で決める */
+                aspect-ratio: 800 / 600;
+                /* ★常にゲームの比率を保つ */
+            }
+
+            /* --- リサイズ用のJavaScriptを上書きするため --- */
+            /* JSがwidth/heightをstyle属性で設定しますが、 */
+            /* それを無効化してCSSで制御します */
+            .game-wrapper {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+
+        /* --- ヘルプモーダル --- */
+        .help-btn {
+            width: auto;
+            /* 幅を自動調整 */
+            max-width: 250px;
+            /* 最大幅を指定 */
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #3498db;
+            /* ボタンの色を青系に変更 */
+            color: white;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+        }
+
+        .help-btn:hover {
+            background-color: #5dade2;
+        }
+
+        #help-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            /* 初期状態は非表示 */
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #help-modal.open {
+            /* ← ★★★ .modal-overlay から #help-modal に変更 ★★★ */
+            display: flex;
+            /* 表示状態 */
+        }
+
+        .modal-content {
+            background-color: #34495e;
+            color: #ecf0f1;
+            padding: 25px 30px;
+            border-radius: 10px;
+            border: 2px solid #ecf0f1;
+            max-width: 700px;
+            max-width: 90%;
+            /* ← 700px から変更 */
+            max-height: 90%;
+            /* ← 85vh から変更 */
+            overflow-y: auto;
+            position: relative;
+            /* 閉じるボタンの基準 */
+            font-size: clamp(14px, 1.2vw, 16px);
+            line-height: 1.6;
+        }
+
+        .modal-content h2,
+        .modal-content h3 {
+            color: #f1c40f;
+            margin-top: 0;
+            border-bottom: 1px solid #7f8c8d;
+            padding-bottom: 5px;
+        }
+
+        .modal-content h3 {
+            margin-top: 20px;
+        }
+
+        .modal-content ul {
+            padding-left: 20px;
+        }
+
+        .modal-content li {
+            margin-bottom: 10px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        /* --- アニメーションコントロール --- */
+        #animation-controls {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: #3d566e;
+            border-radius: 5px;
+            color: white;
+            font-size: 13px;
+        }
+
+        /* --- ピクセルグリッドの分割線 --- */
+        .pixel-cell.split-h {
+            /* 垂直線 */
+            border-right: 1px solid rgba(255, 0, 0, 0.6);
+        }
+
+        .pixel-cell.split-v {
+            /* 水平線 */
+            border-bottom: 1px solid rgba(255, 0, 0, 0.6);
+        }
+
+        /* --- アニメーション速度スライダー --- */
+        #anim-speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        #anim-speed-control input[type="range"] {
+            flex-grow: 1;
+        }
+
+        #anim-speed-control span {
+            font-weight: bold;
+            width: 20px;
+            text-align: right;
+        }
+
+
+
+        /* --- キャラクタースロット --- */
+        #char-slots {
+            position: absolute;
+            /* 中央に配置するため */
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: -20px;
+        }
+
+        .char-slot {
+            width: 30px;
+            /* 少し小さめに */
+            height: 30px;
+            background-color: rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            cursor: pointer;
+            /* キャラサムネイル用の設定 */
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="game-container">
+
+        <!-- === 左パネル (ドット絵工房 & シーケンサー) === -->
+        <div id="pixel-art-editor">
+            <div class="legend-header">
+                <div id="image-upload-container">
+                    <label for="player-image-upload">キャラ画像を変更</label>
+                    <input type="file" id="player-image-upload" accept="image/*">
+                    <button id="reset-image-btn" class="custom-btn">デフォルトに戻す</button>
+                </div>
+                <div id="stats-display">
+                    <div id="color-tendency-preview">-</div>
+                    <div id="speed-bonus-display">スピード補正: +0.00</div>
+                    <div id="jump-bonus-display">ジャンプ補正: +0.00</div>
+                    <div id="bullet-size-display">弾サイズ: 8.00</div>
+                    <div id="bullet-speed-display">弾速: 8.00</div>
+                </div>
+            </div>
+            <div id="pixel-grid"></div>
+            <div id="color-palette"></div>
+            <button id="apply-pixel-art" class="custom-btn">キャラクターに適用</button>
+            <div style="display: flex; gap: 5px;">
+                <button id="save-to-slot-1" class="custom-btn">スロット1保存</button>
+                <button id="save-to-slot-2" class="custom-btn">スロット2保存</button>
+                <button id="save-to-slot-3" class="custom-btn">スロット3保存</button>
+            </div>
+            <button id="clear-pixel-grid" class="custom-btn">全消去</button>
+            <button id="save-pixel-art" class="custom-btn">ドット絵を保存(PNG)</button>
+            <button id="save-pixel-art-json" class="custom-btn">ドット絵を保存(JSON)</button>
+            <button id="load-pixel-art-json" class="custom-btn">ドット絵を読込(JSON)</button>
+            <input type="file" id="pixel-art-file-input" accept=".json" style="display: none;">
+
+            <div id="animation-controls">
+                <label><input type="radio" name="anim-mode" value="none" checked> アニメなし</label>
+                <label><input type="radio" name="anim-mode" value="2frames"> 2分割 (1x2)</label>
+                <label><input type="radio" name="anim-mode" value="4frames"> 4分割 (2x2)</label>
+                <label><input type="radio" name="anim-mode" value="6frames"> 6分割 (3x2)</label>
+                <div id="anim-speed-control">
+                    <label for="anim-speed-slider">速度(フレーム間隔):</label>
+                    <input type="range" id="anim-speed-slider" min="2" max="30" value="10">
+                    <span id="anim-speed-display">10</span>
+                </div>
+            </div>
+
+            <div id="sequencer">
+                <div id="sequencer-grid"></div>
+                <div id="sequencer-controls">
+                    <button id="play-pause-btn" class="custom-btn">再生</button>
+                    <button id="clear-sequencer-btn" class="custom-btn">全消去</button>
+                    <button id="save-beat-btn" class="custom-btn">保存</button>
+                    <button id="load-beat-btn" class="custom-btn">読込</button>
+                    <input type="file" id="beat-file-input" accept=".json" style="display: none;">
+                </div>
+                <div id="bpm-control"
+                    style="margin-top: 10px; display: flex; align-items: center; gap: 10px; color: white;">
+                    <label for="bpm-slider" style="font-weight: bold; font-size: 14px;">BPM:</label>
+                    <input type="range" id="bpm-slider" min="60" max="180" value="120" style="flex-grow: 1;">
+                    <span id="bpm-display"
+                        style="font-weight: bold; font-size: 14px; width: 30px; text-align: right;">120</span>
+                </div>
+                <div id="track-info">
+                    <span>スクロール: OFF</span> | <span>スコア倍率: x1.0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- === 中央パネル (ゲーム画面 & オブジェクト説明) === -->
+        <div class="main-content">
+            <div class="game-wrapper">
+                <canvas id="gameCanvas"></canvas>
+
+                <div id="inventory">
+                    <div class="item-display"><span class="item-icon">🛡️</span><span id="shield-rescues-count">0</span>
+                    </div>
+                    <div class="item-display"><span class="item-icon">🕊️</span><span id="fall-rescues-count">0</span>
+                    </div>
+                    <div class="item-display"><span class="item-icon">🪶</span><span id="double-jumps-count">0</span>
+                    </div>
+                    <div class="item-display"><span class="item-icon">⏳</span><span id="time-stops-count">0</span></div>
+                    <div class="item-display"><span class="item-icon">🔥</span><span id="power-ups-count">0</span></div>
+                </div>
+
+                <div id="game-over-screen">
+                    <div id="game-over-text"></div>
+                    <a id="tweet-link" href="#" target="_blank" class="tweet-button">スコアをツイート Ⓧ</a>
+                </div>
+
+                <div id="mobile-controls">
+                    <div class="control-group">
+                        <div class="control-btn" id="btn-left">◀</div>
+                        <div class="control-btn" id="btn-right">▶</div>
+                    </div>
+                    <div id="char-slots" class="control-group">
+                        <div class="char-slot" id="slot-1">1</div>
+                        <div class="char-slot" id="slot-2">2</div>
+                        <div class="char-slot" id="slot-3">3</div>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-btn" id="btn-action">◎</div>
+                        <div class="control-btn" id="btn-jump">▲</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="legend">
+
+                <div class="legend-item">
+                    <div class="legend-shape shape-player"></div><span>プレイヤー</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-merchant"></div><span>商人</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-platform"></div><span>通常の足場</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-ice"></div><span>氷の床 (滑る)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-fragile"></div><span>崩れる床</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-moving"></div><span>動く床</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-jump-pad"></div><span>ジャンプ台</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-spike"></div><span>棘</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-ground-enemy"></div><span>地上敵</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-air-enemy"></div><span>空中敵</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-turret"></div><span>砲台</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-coin"></div><span>タイムコイン (+5秒)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-item">🛡️</div><span>無敵シールド</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-item">🕊️</div><span>空中復帰</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-item">🪶</div><span>ダブルジャンプ</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-item">⏳</div><span>時の砂時計</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-item">🔥</div><span>パワーアップ</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-shape shape-ladder"></div><span>ハシゴ</span>
+                </div>
+                <button id="show-help-btn" class="custom-btn help-btn">遊び方ヘルプ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="help-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="close-help-modal" class="close-btn">&times;</button>
+            <h2>ゲームの遊び方</h2>
+            <h3>操作方法</h3>
+            <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                <thead style="border-bottom: 1px solid #7f8c8d;">
+                    <tr>
+                        <th style="padding: 8px;">操作</th>
+                        <th style="padding: 8px;">キーボード</th>
+                        <th style="padding: 8px;">画面ボタン</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px;">移動</td>
+                        <td style="padding: 8px;">← → or A D</td>
+                        <td style="padding: 8px;">◀ ▶</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px;">ジャンプ/ハシゴ登る</td>
+                        <td style="padding: 8px;">スペース or ↑ or W</td>
+                        <td style="padding: 8px;">▲</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px;">アクション (射撃/浮遊)</td>
+                        <td style="padding: 8px;">左Shift or X</td>
+                        <td style="padding: 8px;">◎</td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <h3>スコアについて</h3>
+            <p>・ステージを右に進むとスコアが増えます。後退するとスコアが減少します。<br>
+                ・敵を倒すとスコアが加算されます。（+50点）<br>
+                ・ボスを倒すと、より多くのスコアを獲得できます。<br>
+                ・アイテムの上にあるゲージはボス戦までの前進猶予を示しています。</p>
+            <h3>操作のヒント</h3>
+            <p>・画面の中央にあるラインより上を移動すると、追い風に乗って<strong>移動スピードが大幅にアップ</strong>します。これを利用して一気に距離を稼いだり、危険な場所を素早く突破したりできます。</p>
+            <h3>アイテム一覧</h3>
+            <ul>
+                <li><strong>🛡️ 無敵シールド:</strong> 敵の攻撃や棘から一度だけ身を守ります。</li>
+                <li><strong>🕊️ 空中復帰:</strong> ステージから落下してしまった時に一度だけ助かります。</li>
+                <li><strong>🪶 ダブルジャンプ:</strong> 空中で追加のジャンプが可能になります。</li>
+                <li><strong>⏳ 時の砂時計:</strong> 一定時間、敵やギミックの動きを完全に止められ、ボスとの戦闘も回避できます。無敵シールドか空中復帰が使用されると自動的に発動します。</li>
+                <li><strong>🔥 パワーアップ:</strong>
+                    一定時間、ファイア・アイスの弾が大きくなり、攻撃力の上昇と当たっても消えない貫通力を持ちます。浮遊の場合は上昇・落下速度低下の効果が高まります。無敵シールドか空中復帰が使用されると自動的に発動します。
+                </li>
+            </ul>
+
+            <h3>ドット絵工房</h3>
+            <p>左のパネルでは、自分だけのオリジナルキャラクターを作成できます。「キャラクターに適用」ボタンでゲームに反映され、画像の縦横比や色合いによって、性能や特殊能力が変化します。</p>
+            <ul>
+                <li><strong>暖色系が多い画像:</strong> ファイアボールを撃てるようになります。敵やギミックを破壊できます。</li>
+                <li><strong>寒色系が多い画像:</strong> アイスブロックを撃てるようになります。敵やギミックを凍らせて足場にできます。一定時間で凍結が解除され対象は消滅します。</li>
+                <li><strong>それ以外の画像:</strong> 地上でボタンを押し続けることで、燃料を消費して上昇し続けます。空中でボタンを押し続けることで、燃料を消費してゆっくり下降できます。
+                </li>
+            </ul>
+
+            <p>ドット絵工房の<strong>「スロット1〜3へ保存」</strong>ボタンで、作成したキャラクターを保存できます。保存したキャラクターは、ゲーム画面下のスロットにサムネイル表示されます。<br>
+            ゲーム中に、対応する数字キー（1, 2, 3）を押すか、画面のスロットボタンを直接タップすることで、そのキャラクターに<strong>瞬間的に変身</strong>できます。状況に応じてキャラクターを切り替え、ステージを有利に進めましょう！</p>
+
+            <h3>ビートシーケンサー</h3>
+            <p>ドット絵工房の下にあるシーケンサーで、オリジナルのBGMを作成できます。「再生」を押すと、作成したビートに応じてゲームの難易度とスコア倍率がリアルタイムで変化します。</p>
+            <ul>
+                <li><strong>ノート数が多いほど:</strong> 強制スクロールが速くなり、スコア倍率も上がります。</li>
+                <li><strong>BPMが高いほど:</strong> 強制スクロールがさらに速くなり、スコア倍率もさらに上がります。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GAME_WIDTH = 800; const GAME_HEIGHT = 600;
+        canvas.width = GAME_WIDTH; canvas.height = GAME_HEIGHT;
+
+        // ★★★ ボス設定用の定数 ★★★
+        const BOSS_SPAWN_SCORE_INTERVAL = 5000;
+        const BOSS_BASE_SIZE = 60;
+        const BOSS_SIZE_INCREASE_PER_INTERVAL = 20;
+        const BOSS_MIN_SIDES = 1;
+        const BOSS_MAX_SIDES = 5;
+        const BOSS_PART_SIZE = 25;
+        const BOSS_BASE_SPEED = 0.5;
+        const BOSS_ROTATION_SPEED = 0.005;
+        const BOSS_PART_SHOOT_COOLDOWN_MIN = 150;
+        const BOSS_PART_SHOOT_COOLDOWN_RANGE = 100;
+        const BOSS_SCORE_PER_PART = 150;
+
+        const player = {
+            x: 100, y: 450, width: 30, height: 30, color: '#000000', velocityX: 0, velocityY: 0,
+            baseSpeed: 4.5, baseJumpPower: 13, onGround: false, onLadder: false, angle: 0,
+            shieldRescues: 0, fallRescues: 0, doubleJumps: 0, timeStops: 0, powerUps: 0,
+            invincible: false, invincibleTimer: 0, poweredUp: false, powerUpTimer: 0,
+            image: null, facing: 1, colorAbility: 'neutral', shotCooldown: 0, hoverFuel: 120,
+            shotCooldownMax: { fire: 40, ice: 60 },
+            isTrading: false, isGravityReversing: false, isHelpOpen: false,
+            isAnimated: false,
+            spriteSheet: null,
+            frameCount: 0,
+            currentFrame: 0,
+            frameWidth: 0,
+            frameHeight: 0,
+            animationTimer: 0,
+            animationSpeed: 10,
+            characterSlots: [null, null, null]
+        };
+
+        const PLAYER_DEFAULT_WIDTH = 30;
+        const PLAYER_DEFAULT_HEIGHT = 30;
+        const PLAYER_MIN_SIZE = 15;
+        const PLAYER_MAX_SIZE = 120;
+        const HOVER_FUEL_MAX = 120;
+        const COYOTE_TIME_FRAMES = 6;
+
+        const keys = {};
+        const gravity = 0.6; const windFactor = 3; const JUMP_PAD_BOOST = 1.5;
+        const INITIAL_TIME = 120;
+        const COIN_TIME_BONUS = 5;
+
+        let platforms = [], obstacles = [], ladders = [], groundEnemies = [], airEnemies = [], jumpPads = [], timeCoins = [], shieldRescueItems = [], fallRescueItems = [], doubleJumpItems = [], turrets = [], playerProjectiles = [], enemyProjectiles = [], merchants = [], timeStopItems = [], powerUpItems = []; bossBeams = [];
+        let boss = null, bossFightActive = false, nextBossScore = BOSS_SPAWN_SCORE_INTERVAL;
+        let lastBossSides = 0;
+        let scoreAtLastBossDefeat = 0;
+        let bossDefeatCount = 0;
+        let score = 0, lastPositionScore = 0, timeLeft = INITIAL_TIME, gameOver = false, cameraX = 0, frameCounter = 0;
+        let jumpKeyPressedLastFrame = false, actionKeyPressedLastFrame = false;
+        let isTimeFrozen = false, timeFreezeTimer = 0;
+
+        // ★★★ ここからが新しいシーケンサー設定です ★★★
+        let BPM = 120;
+        const STEPS_PER_BEAT = 4;
+        const TOTAL_STEPS = 16;
+        let sequencerInterval = null;
+        let currentStep = 0;
+        let isPlaying = false;
+        let forcedScrollSpeed = 0;
+        let scoreMultiplier = 1.0;
+
+        const PARTS = {
+            // --- 低音域のリズム (ビートの土台) ---
+            KICK: { sound: { freq: 80, duration: 0.1, vol: 0.5, type: 'triangle', freqEnd: 40 }, pattern: Array(TOTAL_STEPS).fill(0) },
+            SNARE: { sound: { freq: 250, duration: 0.1, vol: 0.3, type: 'square' }, pattern: Array(TOTAL_STEPS).fill(0) },
+
+            // --- 中音域のパーカッション (彩り) ---
+            TOM: { sound: { freq: 180, duration: 0.15, vol: 0.4, type: 'sine', freqEnd: 100 }, pattern: Array(TOTAL_STEPS).fill(0) },
+            CLAP: { sound: { freq: 600, duration: 0.1, vol: 0.2, type: 'square', freqEnd: 1000 }, pattern: Array(TOTAL_STEPS).fill(0) },
+
+            // --- 高音域のリズム (グルーヴ感) ---
+            HAT: { sound: { freq: 800, duration: 0.05, vol: 0.1, type: 'sawtooth', freqEnd: 1200 }, pattern: Array(TOTAL_STEPS).fill(0) },
+            OPEN_HAT: { sound: { freq: 900, duration: 0.4, vol: 0.1, type: 'sawtooth', freqEnd: 1400 }, pattern: Array(TOTAL_STEPS).fill(0) },
+
+            // --- 音階のある楽器 (音楽の骨格) ---
+            BASS: { sound: { freq: 120, duration: 0.1, vol: 0.3, type: 'sine', freqEnd: 100 }, pattern: Array(TOTAL_STEPS).fill(0) },
+            LEAD_SYNTH: { sound: { freq: 440, duration: 0.1, vol: 0.3, type: 'sawtooth', freqEnd: 466 }, pattern: Array(TOTAL_STEPS).fill(0) },
+        };
+        // ★★★ ここまで ★★★
+
+        let audioCtx;
+        let isAudioInitialized = false;
+        function initAudio() {
+            if (isAudioInitialized) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+                isAudioInitialized = true;
+            } catch (e) { console.error("Web Audio API is not supported."); }
+        }
+        const sfx = { playSound: (freq, duration, vol, type, freqEnd = freq) => { if (!isAudioInitialized || !audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = type; o.frequency.setValueAtTime(freq, audioCtx.currentTime); if (freq !== freqEnd) o.frequency.linearRampToValueAtTime(freqEnd, audioCtx.currentTime + duration); g.gain.setValueAtTime(vol, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime + duration); }, jump: () => sfx.playSound(261, 0.1, 0.2, 'sine', 523), doubleJump: () => sfx.playSound(392, 0.1, 0.2, 'sine', 784), enemyDefeat: () => sfx.playSound(200, 0.15, 0.3, 'square', 50), shieldUse: () => sfx.playSound(880, 0.3, 0.3, 'triangle', 1200), fallUse: () => sfx.playSound(440, 0.5, 0.4, 'sawtooth', 1000), itemGet: () => sfx.playSound(523, 0.2, 0.3, 'triangle', 880), gameOver: () => sfx.playSound(300, 0.8, 0.4, 'sawtooth', 100), shootFire: (pitch = 150) => sfx.playSound(pitch, 0.1, 0.3, 'sawtooth', pitch - 50), shootIce: (pitch = 600) => sfx.playSound(pitch, 0.15, 0.2, 'sine', pitch + 200), enemyShoot: () => sfx.playSound(100, 0.1, 0.2, 'square'), trade: () => sfx.playSound(1046, 0.2, 0.4, 'sine', 1396), bossDefeat: () => sfx.playSound(130, 1.5, 0.5, 'sawtooth', 2000), powerUp: () => sfx.playSound(440, 0.4, 0.4, 'square', 1760), timeStop: () => sfx.playSound(1760, 0.4, 0.4, 'square', 440) };
+
+        const pixelGrid = document.getElementById('pixel-grid');
+        const colorPalette = document.getElementById('color-palette');
+        const applyPixelArtBtn = document.getElementById('apply-pixel-art');
+        const clearPixelGridBtn = document.getElementById('clear-pixel-grid');
+        const savePixelArtBtn = document.getElementById('save-pixel-art');
+        const PIXEL_GRID_SIZE = 32;
+        let drawingColor = '#000000';
+        let isDrawing = false;
+        const colors = [
+            '#FFFFFF', '#C3C3C3', '#585858', '#000000', '#FF4500', '#FFD700', '#9ACD32', '#008000',
+            '#00CED1', '#1E90FF', '#0000CD', '#8A2BE2', '#C71585', '#FF1493', '#A52A2A', 'transparent'
+        ];
+
+        function updatePixelArtPreview() {
+            // ★★★ 表示するHTML要素を取得 ★★★
+            const tendencyDisplay = document.getElementById('color-tendency-preview');
+            const speedBonusDisplay = document.getElementById('speed-bonus-display');
+            const jumpBonusDisplay = document.getElementById('jump-bonus-display');
+            const bulletSizeDisplay = document.getElementById('bullet-size-display');
+            const bulletSpeedDisplay = document.getElementById('bullet-speed-display');
+
+            const tempCanvas = getPixelCanvas();
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.getImageData(0, 0, PIXEL_GRID_SIZE, PIXEL_GRID_SIZE);
+            const data = imageData.data;
+            let hasDrawing = false, warm = 0, cool = 0, neutral = 0;
+            let minX = PIXEL_GRID_SIZE, maxX = -1, minY = PIXEL_GRID_SIZE, maxY = -1;
+
+            // 色の傾向を分析 (内容は変更なし)
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] > 0) {
+                    hasDrawing = true;
+                    const x = (i / 4) % PIXEL_GRID_SIZE;
+                    const y = Math.floor((i / 4) / PIXEL_GRID_SIZE);
+                    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+
+                    const r = data[i], g = data[i + 1], b = data[i + 2];
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const saturation = (max === 0) ? 0 : (max - min) / max;
+                    if (saturation < 0.25 || (max - min) < 20) { neutral++; continue; }
+                    let hue;
+                    if (max === min) hue = 0;
+                    else { switch (max) { case r: hue = (g - b) / (max - min); break; case g: hue = 2 + (b - r) / (max - min); break; case b: hue = 4 + (r - g) / (max - min); break; } hue *= 60; if (hue < 0) hue += 360; }
+                    if (hue >= 315 || hue < 60) warm++; else if (hue >= 150 && hue < 255) cool++; else neutral++;
+                }
+            }
+
+            // ★★★ 描画がない場合は、表示をデフォルトに戻す ★★★
+            if (!hasDrawing) {
+                speedBonusDisplay.textContent = 'スピード補正: +0.00';
+                jumpBonusDisplay.textContent = 'ジャンプ補正: +0.00';
+                bulletSizeDisplay.textContent = '弾サイズ: 8.00';
+                bulletSpeedDisplay.textContent = '弾速: 8.00';
+                return;
+            }
+
+            // ★★★ 色の傾向を表示 ★★★
+            let colorAbilityText = '';
+            if (warm > cool && warm > neutral) colorAbilityText = '暖色系 (ファイア)';
+            else if (cool > warm && cool > neutral) colorAbilityText = '寒色系 (アイス)';
+            else colorAbilityText = '中間色 (浮遊)';
+            tendencyDisplay.textContent = colorAbilityText;
+
+            // ★★★ 性能変化を計算して表示 ★★★
+            const effectiveWidth = (maxX - minX + 1);
+            const effectiveHeight = (maxY - minY + 1);
+            const scale = PLAYER_MAX_SIZE / PIXEL_GRID_SIZE;
+            const previewWidth = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveWidth * scale, PLAYER_MAX_SIZE));
+            const previewHeight = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveHeight * scale, PLAYER_MAX_SIZE));
+
+            const widthRatio = previewWidth / PLAYER_DEFAULT_WIDTH;
+            const heightRatio = previewHeight / PLAYER_DEFAULT_HEIGHT;
+            const speedBonus = Math.max(0, (widthRatio - 1) * 2.0);
+            const jumpBonus = Math.max(0, (heightRatio - 1) * 3.0);
+
+            const sizeRatio = (previewWidth * previewHeight) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT) || 1;
+            const projectileSize = Math.max(4, Math.min(8 * sizeRatio, 16));
+            const projectileSpeed = Math.max(4, Math.min(12 / sizeRatio, 16));
+
+            speedBonusDisplay.textContent = `スピード補正: +${speedBonus.toFixed(2)}`;
+            jumpBonusDisplay.textContent = `ジャンプ補正: +${jumpBonus.toFixed(2)}`;
+            bulletSizeDisplay.textContent = `弾サイズ: ${projectileSize.toFixed(2)}`;
+            bulletSpeedDisplay.textContent = `弾速: ${projectileSpeed.toFixed(2)}`;
+        }
+
+function initPixelEditor() {
+            pixelGrid.innerHTML = ''; 
+            colorPalette.innerHTML = '';
+
+            // ★★★ タッチ位置から対応するセルを見つける関数 ★★★
+            const getCellFromTouch = (touch) => {
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target.classList.contains('pixel-cell')) {
+                    return target;
+                }
+                return null;
+            };
+            
+            // 1. ピクセルグリッドを生成
+            for (let i = 0; i < PIXEL_GRID_SIZE * PIXEL_GRID_SIZE; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('pixel-cell');
+
+                // --- マウス操作 ---
+                cell.addEventListener('mousedown', (e) => { 
+                    isDrawing = true; 
+                    cell.style.backgroundColor = drawingColor; 
+                    updatePixelArtPreview();
+                });
+                cell.addEventListener('mouseover', (e) => { 
+                    if (isDrawing) { 
+                        cell.style.backgroundColor = drawingColor; 
+                        updatePixelArtPreview();
+                    } 
+                });
+                pixelGrid.appendChild(cell);
+            }
+
+            // --- マウスとタッチの描画終了処理 ---
+            document.body.addEventListener('mouseup', () => isDrawing = false);
+            document.body.addEventListener('touchend', () => isDrawing = false);
+            pixelGrid.addEventListener('mouseleave', () => isDrawing = false);
+
+            // ★★★ ここからがタッチ操作対応の追加部分 ★★★
+            let lastTouchedCell = null;
+            pixelGrid.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // 画面のスクロールを防ぐ
+                isDrawing = true;
+                const cell = getCellFromTouch(e.touches[0]);
+                if (cell) {
+                    cell.style.backgroundColor = drawingColor;
+                    lastTouchedCell = cell;
+                    updatePixelArtPreview();
+                }
+            }, { passive: false });
+
+            pixelGrid.addEventListener('touchmove', (e) => {
+                e.preventDefault(); // 画面のスクロールを防ぐ
+                if (isDrawing) {
+                    const cell = getCellFromTouch(e.touches[0]);
+                    // 同じセルを何度も塗りつぶさないようにチェック
+                    if (cell && cell !== lastTouchedCell) {
+                        cell.style.backgroundColor = drawingColor;
+                        lastTouchedCell = cell;
+                        updatePixelArtPreview();
+                    }
+                }
+            }, { passive: false });
+
+            // 2. カラーパレットを生成する
+            colors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.classList.add('color-swatch');
+
+                // 「透明」色の場合は特別な背景画像を設定
+                if (color === 'transparent') {
+                    swatch.style.background = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w.org/2000/svg\' width=\'10\' height=\'10\'%3E%3Crect width=\'10\' height=\'10\' fill=\'white\'/%3E%3Cpath d=\'M0 0 L10 10 M10 0 L0 10\' stroke=\'red\' stroke-width=\'2\'/%3E%3C/svg%3E")';
+                } else {
+                    swatch.style.backgroundColor = color;
+                }
+
+                if (color === drawingColor) swatch.classList.add('active');
+
+                // パレットの色をクリックした時に、選択色を変更し、プレビューを更新する
+                swatch.addEventListener('click', () => {
+                    drawingColor = color;
+                    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                    swatch.classList.add('active');
+                    updatePixelArtPreview(); // ★★★ プレビュー更新を追加 ★★★
+                });
+                colorPalette.appendChild(swatch);
+            });
+
+            // 3. 「全消去」ボタンのクリックイベントを設定する
+            //    (元の場所からここに移動させ、プレビュー更新機能を追加)
+            clearPixelGridBtn.addEventListener('click', () => {
+                document.querySelectorAll('.pixel-cell').forEach(cell => cell.style.backgroundColor = 'transparent');
+                updatePixelArtPreview(); // ★★★ プレビュー更新を追加 ★★★
+            });
+
+            // 4. 関数の最後に、初期状態のプレビューを一度表示する
+            updatePixelArtPreview(); // ★★★ 初期表示のために追加 ★★★
+        }
+
+        clearPixelGridBtn.addEventListener('click', () => { document.querySelectorAll('.pixel-cell').forEach(cell => cell.style.backgroundColor = 'transparent'); });
+
+        function getPixelCanvas() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = PIXEL_GRID_SIZE; tempCanvas.height = PIXEL_GRID_SIZE;
+            const tempCtx = tempCanvas.getContext('2d');
+            const cells = document.querySelectorAll('.pixel-cell');
+            cells.forEach((cell, i) => {
+                const x = i % PIXEL_GRID_SIZE;
+                const y = Math.floor(i / PIXEL_GRID_SIZE);
+                tempCtx.fillStyle = cell.style.backgroundColor || 'transparent';
+                tempCtx.fillRect(x, y, 1, 1);
+            });
+            return tempCanvas;
+        }
+
+        function updatePlayerStats() {
+            const widthRatio = player.width / PLAYER_DEFAULT_WIDTH;
+            const heightRatio = player.height / PLAYER_DEFAULT_HEIGHT;
+            const speedBonus = Math.max(0, (widthRatio - 1) * 2.0);
+            const jumpBonus = Math.max(0, (heightRatio - 1) * 3.0);
+            player.speed = player.baseSpeed + speedBonus;
+            player.jumpPower = player.baseJumpPower + jumpBonus;
+
+            const sizeRatio = (player.width * player.height) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT) || 1;
+            const projectileSize = Math.max(4, Math.min(8 * sizeRatio, 16));
+            const projectileSpeed = Math.max(4, Math.min(12 / sizeRatio, 16));
+
+            // ★★★★★ これが、抜け落ちていた根本原因の修正です！ ★★★★★
+            // キャラクターサイズに応じて、射撃間隔を再計算します。
+            // これにより、クールダウンタイマーが常に有効な数値になります。
+            player.shotCooldownMax = { fire: 40 * sizeRatio, ice: 60 * sizeRatio };
+            player.hoverFuelMax = HOVER_FUEL_MAX * sizeRatio;
+            player.hoverRefillRate = 1 / sizeRatio;
+
+            document.getElementById('speed-bonus-display').textContent = `スピード補正: +${speedBonus.toFixed(2)}`;
+            document.getElementById('jump-bonus-display').textContent = `ジャンプ補正: +${jumpBonus.toFixed(2)}`;
+            document.getElementById('bullet-size-display').textContent = `弾サイズ: ${projectileSize.toFixed(2)}`;
+            document.getElementById('bullet-speed-display').textContent = `弾速: ${projectileSpeed.toFixed(2)}`;
+        }
+
+        function analyzeAndApplyImage(img, applyToPlayer = true) {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = img.width; tempCanvas.height = img.height;
+            tempCtx.drawImage(img, 0, 0);
+            let tendency = 'neutral';
+            try {
+                const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+                const data = imageData.data;
+                let warm = 0, cool = 0, neutral = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i + 3] < 128) continue;
+                    const r = data[i], g = data[i + 1], b = data[i + 2];
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const saturation = (max === 0) ? 0 : (max - min) / max;
+                    if (saturation < 0.25 || (max - min) < 20) { neutral++; continue; }
+                    let hue;
+                    if (max === min) { hue = 0; }
+                    else { switch (max) { case r: hue = (g - b) / (max - min); break; case g: hue = 2 + (b - r) / (max - min); break; case b: hue = 4 + (r - g) / (max - min); break; } hue *= 60; if (hue < 0) hue += 360; }
+                    if (hue >= 315 || hue < 60) warm++; else if (hue >= 150 && hue < 255) cool++; else neutral++;
+                }
+                if (warm > cool && warm > neutral) tendency = 'warm';
+                else if (cool > warm && cool > neutral) tendency = 'cool';
+                else tendency = 'neutral';
+            } catch (e) {
+                console.warn("Could not analyze image colors. Defaulting to neutral.");
+                tendency = 'neutral';
+            }
+
+            if (applyToPlayer) {
+                player.colorAbility = tendency;
+            }
+            return tendency; // ★★★ 結果を返すように変更 ★★★
+        }
+
+        applyPixelArtBtn.addEventListener('click', () => {
+            initAudio();
+            const animationMode = document.querySelector('input[name="anim-mode"]:checked').value;
+            const tempCanvas = getPixelCanvas();
+
+            player.isAnimated = false;
+            player.spriteSheet = null;
+            player.image = null;
+
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.getImageData(0, 0, PIXEL_GRID_SIZE, PIXEL_GRID_SIZE);
+            const data = imageData.data;
+            let minX_total = PIXEL_GRID_SIZE, maxX_total = -1, minY_total = PIXEL_GRID_SIZE, maxY_total = -1;
+            let hasDrawing = false;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] > 0) {
+                    hasDrawing = true;
+                    const x = (i / 4) % PIXEL_GRID_SIZE;
+                    const y = Math.floor((i / 4) / PIXEL_GRID_SIZE);
+                    minX_total = Math.min(minX_total, x); maxX_total = Math.max(maxX_total, x);
+                    minY_total = Math.min(minY_total, y); maxY_total = Math.max(maxY_total, y);
+                }
+            }
+            if (!hasDrawing) return;
+
+            const oldHeight = player.height;
+            let finalWidth, finalHeight;
+
+            if (animationMode === 'none') {
+                const effectiveWidth = (maxX_total - minX_total + 1);
+                const effectiveHeight = (maxY_total - minY_total + 1);
+                const scale = PLAYER_MAX_SIZE / PIXEL_GRID_SIZE;
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveHeight * scale, PLAYER_MAX_SIZE));
+            } else {
+                player.isAnimated = true;
+
+                // ★★★ ここからが修正箇所です ★★★
+                const cols = (animationMode === '6frames') ? 3 : (animationMode === '4frames') ? 2 : 1;
+                const rows = 2;
+                player.frameCount = cols * rows;
+
+                let maxFramePixelWidth = 0;
+                let maxFramePixelHeight = 0;
+
+                const colWidths = (cols === 3) ? [11, 11, 10] : (cols === 2) ? [16, 16] : [32];
+                const rowHeights = [16, 16];
+                const colStarts = (cols === 3) ? [0, 11, 22] : (cols === 2) ? [0, 16] : [0];
+                const rowStarts = [0, 16];
+                // ★★★ ここまでが修正箇所です ★★★
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const cellStartX = colStarts[c];
+                        const cellStartY = rowStarts[r];
+                        const cellWidth = colWidths[c];
+                        const cellHeight = rowHeights[r];
+
+                        let minX_frame = PIXEL_GRID_SIZE, maxX_frame = -1, minY_frame = PIXEL_GRID_SIZE, maxY_frame = -1;
+                        let hasDrawingInFrame = false;
+
+                        for (let y = cellStartY; y < cellStartY + cellHeight; y++) {
+                            for (let x = cellStartX; x < cellStartX + cellWidth; x++) {
+                                const i = (y * PIXEL_GRID_SIZE + x) * 4;
+                                if (data[i + 3] > 0) {
+                                    hasDrawingInFrame = true;
+                                    minX_frame = Math.min(minX_frame, x);
+                                    maxX_frame = Math.max(maxX_frame, x);
+                                    minY_frame = Math.min(minY_frame, y);
+                                    maxY_frame = Math.max(maxY_frame, y);
+                                }
+                            }
+                        }
+
+                        if (hasDrawingInFrame) {
+                            const frameContentWidth = maxX_frame - minX_frame + 1;
+                            const frameContentHeight = maxY_frame - minY_frame + 1;
+                            maxFramePixelWidth = Math.max(maxFramePixelWidth, frameContentWidth);
+                            maxFramePixelHeight = Math.max(maxFramePixelHeight, frameContentHeight);
+                        }
+                    }
+                }
+
+                player.frameWidth = Math.ceil((maxX_total - minX_total + 1) / cols);
+                player.frameHeight = Math.ceil((maxY_total - minY_total + 1) / rows);
+
+                const scale = PLAYER_MAX_SIZE / (PIXEL_GRID_SIZE / Math.max(cols, rows));
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelHeight * scale, PLAYER_MAX_SIZE));
+            }
+
+            player.width = finalWidth;
+            player.height = finalHeight;
+            player.y -= (player.height - oldHeight);
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = (maxX_total - minX_total + 1);
+            finalCanvas.height = (maxY_total - minY_total + 1);
+            finalCanvas.getContext('2d').drawImage(tempCanvas, minX_total, minY_total, finalCanvas.width, finalCanvas.height, 0, 0, finalCanvas.width, finalCanvas.height);
+
+            const img = new Image();
+            img.onload = () => {
+                if (player.isAnimated) {
+                    player.spriteSheet = img;
+                } else {
+                    player.image = img;
+                }
+                updatePlayerStats();
+                analyzeAndApplyImage(img, true);
+                player.shotCooldown = 0;
+                player.hoverFuel = player.hoverFuelMax;
+            };
+            img.src = finalCanvas.toDataURL();
+        });
+        savePixelArtBtn.addEventListener('click', () => {
+            // ★★★ ファイル名の入力を求める ★★★
+            const filename = window.prompt("PNGファイル名を入力してください:", "my-character");
+
+            // ユーザーがキャンセルしたか、名前が空なら処理を中断
+            if (!filename) {
+                return;
+            }
+
+            // ファイル名に使えない文字をアンダースコアに置換（安全対策）
+            const safeFilename = filename.replace(/[\/\\:*?"<>|]/g, '_');
+
+            const tempCanvas = getPixelCanvas();
+            const link = document.createElement('a');
+            // ★★★ 入力されたファイル名を設定（拡張子.pngを追加） ★★★
+            link.download = `${safeFilename}.png`;
+            link.href = tempCanvas.toDataURL();
+            link.click();
+        });
+
+        document.addEventListener('keydown', (e) => { initAudio(); keys[e.code] = true; });
+        document.addEventListener('keyup', (e) => { keys[e.code] = false; });
+        const gameOverScreen = document.getElementById('game-over-screen');
+        gameOverScreen.addEventListener('click', (e) => { initAudio(); if (e.target.tagName !== 'A') init(); });
+        const btnLeft = document.getElementById('btn-left'); const btnRight = document.getElementById('btn-right'); const btnJump = document.getElementById('btn-jump'); const btnAction = document.getElementById('btn-action');
+        // --- 共通のイベント処理を定義 ---
+        const pressLeft = (e) => { e.preventDefault(); initAudio(); keys['KeyA'] = true; };
+        const releaseLeft = (e) => { e.preventDefault(); keys['KeyA'] = false; };
+        const pressRight = (e) => { e.preventDefault(); initAudio(); keys['KeyD'] = true; };
+        const releaseRight = (e) => { e.preventDefault(); keys['KeyD'] = false; };
+        const pressJump = (e) => { e.preventDefault(); initAudio(); keys['Space'] = true; };
+        const releaseJump = (e) => { e.preventDefault(); keys['Space'] = false; };
+        const pressAction = (e) => { e.preventDefault(); initAudio(); keys['ShiftLeft'] = true; };
+        const releaseAction = (e) => { e.preventDefault(); keys['ShiftLeft'] = false; };
+
+        // --- 各ボタンにタッチとマウスの両方のイベントを割り当て ---
+        btnLeft.addEventListener('touchstart', pressLeft); btnLeft.addEventListener('touchend', releaseLeft);
+        btnLeft.addEventListener('mousedown', pressLeft); btnLeft.addEventListener('mouseup', releaseLeft);
+        btnLeft.addEventListener('mouseleave', releaseLeft); // ボタンからマウスが離れた時も離した判定にする
+
+        btnRight.addEventListener('touchstart', pressRight); btnRight.addEventListener('touchend', releaseRight);
+        btnRight.addEventListener('mousedown', pressRight); btnRight.addEventListener('mouseup', releaseRight);
+        btnRight.addEventListener('mouseleave', releaseRight);
+
+        btnJump.addEventListener('touchstart', pressJump); btnJump.addEventListener('touchend', releaseJump);
+        btnJump.addEventListener('mousedown', pressJump); btnJump.addEventListener('mouseup', releaseJump);
+        btnJump.addEventListener('mouseleave', releaseJump);
+
+        btnAction.addEventListener('touchstart', pressAction); btnAction.addEventListener('touchend', releaseAction);
+        btnAction.addEventListener('mousedown', pressAction); btnAction.addEventListener('mouseup', releaseAction);
+        btnAction.addEventListener('mouseleave', releaseAction);
+
+        const imageUploader = document.getElementById('player-image-upload');
+        imageUploader.addEventListener('change', (e) => {
+            initAudio();
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const originalWidth = img.naturalWidth; const originalHeight = img.naturalHeight;
+                        const aspectRatio = originalWidth / originalHeight;
+                        const oldHeight = player.height;
+                        let newWidth, newHeight;
+                        if (originalWidth > originalHeight) {
+                            newWidth = Math.max(PLAYER_MIN_SIZE, Math.min(originalWidth, PLAYER_MAX_SIZE)); newHeight = newWidth / aspectRatio;
+                        } else { newHeight = Math.max(PLAYER_MIN_SIZE, Math.min(originalHeight, PLAYER_MAX_SIZE)); newWidth = newHeight * aspectRatio; }
+                        player.width = Math.max(PLAYER_MIN_SIZE, Math.min(newWidth, PLAYER_MAX_SIZE));
+                        player.height = Math.max(PLAYER_MIN_SIZE, Math.min(newHeight, PLAYER_MAX_SIZE));
+                        player.y -= (player.height - oldHeight);
+                        player.image = img;
+                        updatePlayerStats();
+                        analyzeAndApplyImage(img);
+                        player.shotCooldown = 0; // ファイア/アイスのクールダウンをリセット
+                        player.hoverFuel = player.hoverFuelMax; // 浮遊の燃料を最大まで回復
+                    }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+
+        const resetImageBtn = document.getElementById('reset-image-btn');
+        resetImageBtn.addEventListener('click', () => {
+            initAudio();
+            const oldHeight = player.height;
+            player.image = null;
+            player.width = PLAYER_DEFAULT_WIDTH;
+            player.height = PLAYER_DEFAULT_HEIGHT;
+            player.y -= (player.height - oldHeight);
+            imageUploader.value = null;
+            updatePlayerStats();
+            player.colorAbility = 'neutral';
+            player.shotCooldown = 0;
+            player.hoverFuel = player.hoverFuelMax;
+        });
+
+function generateWorld() {
+            // ★★★ ボス戦時のステージ生成ロジック ★★★
+            if (bossFightActive) {
+                // STEP 1: ボス戦用の超シビアな出現率補正を計算
+                const bossSpawnRateModifier = Math.max(0.05, 1.0 - (forcedScrollSpeed / 5.0) * 0.95);
+
+                const cleanup = (arr) => arr.filter(o => o.x + (o.width || o.radius * 2) > cameraX - GAME_WIDTH);
+                platforms = cleanup(platforms); merchants = cleanup(merchants);
+                shieldRescueItems = cleanup(shieldRescueItems); fallRescueItems = cleanup(fallRescueItems);
+                doubleJumpItems = cleanup(doubleJumpItems); timeStopItems = cleanup(timeStopItems);
+                powerUpItems = cleanup(powerUpItems); timeCoins = cleanup(timeCoins);
+
+                let lastPlatformX = 0;
+                if (platforms.length > 0) { lastPlatformX = Math.max(...platforms.map(p => p.x + p.width)); }
+
+                while (lastPlatformX < cameraX + GAME_WIDTH * 1.5) {
+                    const newX = lastPlatformX;
+                    const platformWidth = 400;
+
+                    // 20%の確率で足場に穴をあける
+                    if (Math.random() < 0.2) {
+                        const gapWidth = Math.random() * 100 + 120; // 穴の幅を広く
+                        const firstPartWidth = (platformWidth - gapWidth) / 2;
+                        platforms.push({ x: newX, y: GAME_HEIGHT - 40, width: firstPartWidth, height: 20, type: 'normal' });
+                        platforms.push({ x: newX + firstPartWidth + gapWidth, y: GAME_HEIGHT - 40, width: firstPartWidth, height: 20, type: 'normal' });
+                    } else {
+                        platforms.push({ x: newX, y: GAME_HEIGHT - 40, width: platformWidth, height: 20, type: 'normal' });
+                    }
+
+                    // STEP 2: 全ての出現判定に、計算した補正値を掛け合わせる
+                    if (Math.random() < 0.1 * bossSpawnRateModifier) merchants.push({ x: newX + 180, y: GAME_HEIGHT - 80, width: 40, height: 40 });
+                    if (Math.random() < 0.05 * bossSpawnRateModifier) shieldRescueItems.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 12 });
+                    if (Math.random() < 0.05 * bossSpawnRateModifier) fallRescueItems.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 12 });
+                    if (Math.random() < 0.05 * bossSpawnRateModifier) doubleJumpItems.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 12 });
+                    if (Math.random() < 0.05 * bossSpawnRateModifier) timeStopItems.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 12 });
+                    if (Math.random() < 0.05 * bossSpawnRateModifier) powerUpItems.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 12 });
+                    if (Math.random() < 0.15 * bossSpawnRateModifier) { timeCoins.push({ x: newX + Math.random() * 300, y: GAME_HEIGHT - 80, radius: 10 }); }
+                    
+                    lastPlatformX += platformWidth;
+                }
+                return; // ボス戦中の処理はここまで
+            }
+
+            // ★★★ 通常時のステージ生成ロジック ★★★
+            let occupiedSpaces = [];
+            const isOccupied = (x, width) => {
+                for (const space of occupiedSpaces) {
+                    if (x < space.x + space.width && x + width > space.x) { return true; }
+                }
+                return false;
+            };
+
+            const cleanup = (arr) => arr.filter(o => o.x + (o.width || o.radius * 2) > cameraX - GAME_WIDTH * 2);
+            platforms = cleanup(platforms); obstacles = cleanup(obstacles); ladders = cleanup(ladders);
+            merchants = cleanup(merchants);
+            const enemyCleanup = (arr) => arr.filter(e => e.x + (e.width || e.radius * 2) > cameraX - GAME_WIDTH * 2);
+            groundEnemies = enemyCleanup(groundEnemies); airEnemies = enemyCleanup(airEnemies);
+            turrets = enemyCleanup(turrets); enemyProjectiles = enemyCleanup(enemyProjectiles);
+            timeCoins = cleanup(timeCoins); shieldRescueItems = cleanup(shieldRescueItems); fallRescueItems = cleanup(fallRescueItems); doubleJumpItems = cleanup(doubleJumpItems); timeStopItems = cleanup(timeStopItems); powerUpItems = cleanup(powerUpItems);
+            playerProjectiles = cleanup(playerProjectiles);
+
+            let lastGeneratedX = 0;
+            [...platforms, ...jumpPads, ...ladders].forEach(p => { if (p.x + p.width > lastGeneratedX) lastGeneratedX = p.x + p.width; });
+            
+            while (lastGeneratedX < cameraX + GAME_WIDTH) {
+                // STEP 1: 通常時用の出現率補正を計算
+                const speedBasedModifier = Math.max(0.2, 1.0 - (forcedScrollSpeed / 5.0) * 0.8);
+                
+                const newAreaStartX = lastGeneratedX + (Math.random() * 150 + 100);
+                let generatedHighPlatform = null, generatedLowPlatform = null;
+
+                // --- 低い足場の生成 ---
+                if (Math.random() < 0.95) {
+                    const width = Math.random() * 180 + 120; const y = GAME_HEIGHT - (Math.random() * 100 + 60);
+                    const platformType = Math.random();
+                    if (platformType < 0.15) platforms.push({ x: newAreaStartX, y, width, height: 20, type: 'fragile', state: 'stable', timer: 45 });
+                    else if (platformType < 0.3) platforms.push({ x: newAreaStartX, y, width, height: 20, type: 'moving_h', originalX: newAreaStartX, moveSpeed: 1, moveRange: 100, moveDir: 1 });
+                    else platforms.push({ x: newAreaStartX, y, width, height: 20, type: 'normal' });
+                    generatedLowPlatform = platforms[platforms.length - 1];
+                    
+                    if (Math.random() < 0.4) {
+                        const x = generatedLowPlatform.x + width / 2 - 15;
+                        const w = 30;
+                        if (!isOccupied(x, w)) { jumpPads.push({ x: x, y: y - 10, width: w, height: 10 }); occupiedSpaces.push({ x: x, width: w }); }
+                    }
+                    // STEP 2: 出現判定に補正値を適用
+                    if (Math.random() < 0.1 * speedBasedModifier) {
+                        const x = generatedLowPlatform.x + width * Math.random();
+                        const w = 24;
+                        if (!isOccupied(x - w / 2, w)) { shieldRescueItems.push({ x: x, y: y - 40, radius: 12 }); occupiedSpaces.push({ x: x - w / 2, width: w }); }
+                    }
+                    if (Math.random() < 0.25) {
+                        const x = generatedLowPlatform.x + 20, w = 20;
+                        if (!isOccupied(x, w)) { groundEnemies.push({ x, y: y - 20, width: w, height: 20, vx: 1, moveRange: width - 40, initialX: x }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                    if (Math.random() < 0.25) {
+                        const x = newAreaStartX + width / 2, w = 25;
+                        if (!isOccupied(x, w)) { airEnemies.push({ x, y: y - 80, width: w, height: 25, vy: 1, moveRange: 60, initialY: y - 80 }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                    if (Math.random() < 0.15) {
+                        const x = generatedLowPlatform.x + width / 2 - 15, w = 30;
+                        if (!isOccupied(x, w)) { turrets.push({ x, y: y - 30, width: w, height: 30, type: 'cannon', cooldown: 180 }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                    // STEP 2: 出現判定に補正値を適用
+                    if (Math.random() < 0.2 * speedBasedModifier) {
+                        const x = newAreaStartX + width / 2 - 20, w = 40;
+                        if (!isOccupied(x, w)) { merchants.push({ x, y: y - 40, width: w, height: 40 }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                }
+
+                // --- 高い足場の生成 ---
+                if (Math.random() < 0.95) {
+                    const width = Math.random() * 150 + 100; const y = Math.random() * 150 + 100;
+                    const platformType = Math.random();
+                    if (platformType < 0.3) platforms.push({ x: newAreaStartX + (Math.random() * 100 - 50), y, width, height: 20, type: 'ice' });
+                    else if (platformType < 0.45) platforms.push({ x: newAreaStartX + (Math.random() * 100 - 50), y, width: 120, height: 20, type: 'moving_v', originalY: y, moveSpeed: 1, moveRange: 80, moveDir: 1 });
+                    else platforms.push({ x: newAreaStartX + (Math.random() * 100 - 50), y, width, height: 20, type: 'normal' });
+                    generatedHighPlatform = platforms[platforms.length - 1];
+
+                    if (Math.random() < 0.4) {
+                        const x = generatedHighPlatform.x + (width / 2) - 12.5, w = 25;
+                        if (!isOccupied(x, w)) { obstacles.push({ x, y: y - 25, width: w, height: 25 }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                    if (Math.random() < 0.1) {
+                        const x = generatedHighPlatform.x + width / 2 - 15, w = 30;
+                        if (!isOccupied(x, w)) { turrets.push({ x, y: y - 30, width: w, height: 30, type: 'killer', cooldown: 240 }); occupiedSpaces.push({ x, width: w }); }
+                    }
+                    
+                    // STEP 2: 全ての出現判定に補正値を適用
+                    if (Math.random() < 0.6 * speedBasedModifier) {
+                        const x = generatedHighPlatform.x + width * Math.random();
+                        const w = 20;
+                        if (!isOccupied(x - w / 2, w)) { timeCoins.push({ x: x, y: y - 40, radius: 10 }); occupiedSpaces.push({ x: x - w / 2, width: w }); }
+                    }
+                    if (Math.random() < 0.1 * speedBasedModifier) fallRescueItems.push({ x: generatedHighPlatform.x + width * Math.random(), y: y - 40, radius: 12 });
+                    if (Math.random() < 0.15 * speedBasedModifier) doubleJumpItems.push({ x: generatedHighPlatform.x + width * Math.random(), y: y - 40, radius: 12 });
+                    if (Math.random() < 0.1 * speedBasedModifier) timeStopItems.push({ x: generatedHighPlatform.x + width * Math.random(), y: y - 40, radius: 12 });
+                    if (Math.random() < 0.05 * speedBasedModifier) powerUpItems.push({ x: generatedHighPlatform.x + width * Math.random(), y: y - 40, radius: 12 });
+                }
+
+                if (!generatedHighPlatform && !generatedLowPlatform) platforms.push({ x: newAreaStartX, y: GAME_HEIGHT - 80, width: 150, height: 20, type: 'normal' });
+                if (generatedHighPlatform && generatedLowPlatform) { const high = generatedHighPlatform; const low = generatedLowPlatform; const overlapX_start = Math.max(high.x, low.x); const overlapX_end = Math.min(high.x + high.width, low.x + low.width); if (overlapX_end > overlapX_start && Math.random() < 0.75) { const ladderX = overlapX_start + (overlapX_end - overlapX_start) / 2; ladders.push({ x: ladderX - 15, y: high.y, width: 30, height: low.y - high.y }); } }
+                lastGeneratedX = newAreaStartX + 180;
+            }
+        }
+        function spawnBoss() {
+            bossFightActive = true;
+            let numSides;
+            do {
+                numSides = Math.floor(Math.random() * (BOSS_MAX_SIDES - BOSS_MIN_SIDES + 1)) + BOSS_MIN_SIDES;
+            } while (numSides === lastBossSides && BOSS_MAX_SIDES - BOSS_MIN_SIDES > 0);
+            lastBossSides = numSides;
+
+            // ★★★ ここからが【討伐数連動型AI】の新ロジックです ★★★
+            // 討伐数がそのまま「成長レベル」になる
+            const growthLevel = bossDefeatCount;
+
+            // 基本HPと上位HPを計算
+            const baseHp = 1 + growthLevel;
+            const advancedHp = baseHp + 1;
+
+            // 上位HPを持つパーツが出現する「確率」を計算
+            // ボスを倒すごとに、より高いHPのパーツが出やすくなる
+            const advancedHpChance = 0.25 * growthLevel;
+
+            // HPに上限を設定
+            const finalBaseHp = Math.min(baseHp, 9);
+            const finalAdvancedHp = Math.min(advancedHp, 10);
+
+            const bossSize = BOSS_BASE_SIZE;
+            // ★★★ ここまで ★★★
+
+            let partDesigns = [];
+            const currentRotation = boss ? boss.rotation : 0;
+
+            for (let i = 0; i < numSides * 2; i++) {
+                const hp = (Math.random() < advancedHpChance) ? finalAdvancedHp : finalBaseHp;
+
+                partDesigns.push({
+                    isCorner: i % 2 === 0,
+                    angle: (i * ((Math.PI * 2) / (numSides * 2))) - currentRotation,
+                    alive: true,
+                    hp: hp,
+                    initialHp: hp
+                });
+            }
+
+            boss = {
+                x: cameraX + GAME_WIDTH,
+                y: GAME_HEIGHT / 2,
+                partDesigns,
+                speed: BOSS_BASE_SPEED,
+                size: bossSize,
+                initialPartsCount: partDesigns.length,
+                rotation: 0,
+                fireCooldown: 120,
+                targetY: GAME_HEIGHT / 2,
+                yVelocity: 0
+            };
+        }
+
+        function showTradeMenu(merchant, index) {
+            const gameWrapper = document.querySelector('.game-wrapper');
+            const menu = document.createElement('div');
+            menu.id = 'trade-menu';
+            const itemsToSell = [
+                { name: '🛡️ 無敵シールド', cost: 500, action: () => { if (player.shieldRescues < 5) player.shieldRescues++; } },
+                { name: '🕊️ 空中復帰', cost: 500, action: () => { if (player.fallRescues < 5) player.fallRescues++; } },
+                { name: '🪶 ダブルジャンプ', cost: 200, action: () => { if (player.doubleJumps < 5) player.doubleJumps++; } },
+                { name: '⏳ 時の砂時計', cost: 350, action: () => { if (player.timeStops < 5) player.timeStops++; } },
+                { name: '🔥 パワーアップ', cost: 350, action: () => { if (player.powerUps < 5) player.powerUps++; } },
+                { name: '⏰ 時間延長 (+30秒)', cost: 3000, action: () => { timeLeft += 40; } },
+
+            ];
+
+            itemsToSell.forEach(item => {
+                const button = document.createElement('button');
+                button.innerHTML = `${item.name} (スコア: ${item.cost})`;
+                if (score < item.cost) {
+                    button.disabled = true;
+                }
+                button.onclick = () => {
+                    if (score >= item.cost) {
+                        score -= item.cost;
+                        item.action();
+                        sfx.trade();
+                        closeMenu();
+                        merchants.splice(index, 1);
+                    }
+                };
+                menu.appendChild(button);
+            });
+
+            const closeButton = document.createElement('button');
+            closeButton.textContent = 'やめる';
+            closeButton.onclick = () => closeMenu();
+            menu.appendChild(closeButton);
+
+            function closeMenu() {
+                player.isTrading = false;
+                // ★★★ ラッパー要素からメニューを削除するように変更 ★★★
+                gameWrapper.removeChild(menu);
+            }
+
+            // ★★★ ラッパー要素にメニューを追加するように変更 ★★★
+            gameWrapper.appendChild(menu);
+        }
+
+        function savePixelArtJSON() {
+            // ★★★ ファイル名の入力を求める ★★★
+            const filename = window.prompt("ドット絵のファイル名(JSON)を入力してください:", "my-pixel-art");
+            if (!filename) { return; }
+            const safeFilename = filename.replace(/[\/\\:*?"<>|]/g, '_');
+
+            const cells = document.querySelectorAll('.pixel-cell');
+            const pixelData = Array.from(cells).map(cell => cell.style.backgroundColor || 'transparent');
+            const jsonData = { pixels: pixelData };
+            const jsonString = JSON.stringify(jsonData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            // ★★★ 入力されたファイル名を設定（拡張子.jsonを追加） ★★★
+            a.download = `${safeFilename}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function loadPixelArtJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    if (loadedData.pixels && Array.isArray(loadedData.pixels) && loadedData.pixels.length === PIXEL_GRID_SIZE * PIXEL_GRID_SIZE) {
+                        const cells = document.querySelectorAll('.pixel-cell');
+                        cells.forEach((cell, index) => {
+                            cell.style.backgroundColor = loadedData.pixels[index];
+                        });
+                        updatePixelArtPreview(); // ★★★ 読込後、プレビューを更新 ★★★
+                        alert('ドット絵を読み込みました！');
+                    } else {
+                        alert('エラー: 無効なドット絵ファイルです。');
+                    }
+                } catch (error) {
+                    alert('エラー: ファイルの読み込みに失敗しました。');
+                    console.error("Pixel art loading error:", error);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = null;
+        }
+
+        function saveBeat() {
+            // ★★★ ファイル名の入力を求める ★★★
+            const filename = window.prompt("ビートのファイル名(JSON)を入力してください:", "my-beat");
+            if (!filename) { return; }
+            const safeFilename = filename.replace(/[\/\\:*?"<>|]/g, '_');
+
+            const beatData = {
+                bpm: BPM,
+                patterns: {}
+            };
+            Object.keys(PARTS).forEach(partName => {
+                beatData.patterns[partName] = PARTS[partName].pattern;
+            });
+
+            const jsonString = JSON.stringify(beatData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            // ★★★ 入力されたファイル名を設定（拡張子.jsonを追加） ★★★
+            a.download = `${safeFilename}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ★★★ ここからが【読込機能】の関数です ★★★
+        function loadBeat(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+
+                    // ★★★ STEP 1: データ形式をチェック ★★★
+                    if (loadedData.bpm && loadedData.patterns) {
+
+                        // ★★★ STEP 2: BPMを読み込んで適用 ★★★
+                        BPM = parseInt(loadedData.bpm, 10) || 120; // 無効な値なら120に
+                        document.getElementById('bpm-slider').value = BPM;
+                        document.getElementById('bpm-display').textContent = BPM;
+
+                        // ★★★ STEP 3: 全ての楽器パターンを読み込んで適用 ★★★
+                        // まず全パートをクリア
+                        Object.keys(PARTS).forEach(partName => {
+                            PARTS[partName].pattern.fill(0);
+                        });
+                        // ファイルに存在するパートのパターンを復元
+                        Object.keys(loadedData.patterns).forEach(partName => {
+                            // 現在のゲームに存在する楽器の場合のみ読み込む
+                            if (PARTS[partName]) {
+                                PARTS[partName].pattern = loadedData.patterns[partName];
+                            }
+                        });
+
+                        if (isPlaying) {
+                            togglePlay();
+                        }
+
+                        updateSequencerUI();
+                        updateGameDifficulty(); // BPMも反映させるため必ず呼び出す
+                        alert('ビートを読み込みました！');
+                    } else {
+                        alert('エラー: 無効なビートファイルです。（古い形式の可能性があります）');
+                    }
+                } catch (error) {
+                    alert('エラー: ファイルの読み込みに失敗しました。');
+                    console.error("Beat loading error:", error);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = null;
+        }
+
+        function setupPixelArtIO() {
+            document.getElementById('save-pixel-art-json').addEventListener('click', savePixelArtJSON);
+            document.getElementById('load-pixel-art-json').addEventListener('click', () => document.getElementById('pixel-art-file-input').click());
+            document.getElementById('pixel-art-file-input').addEventListener('change', loadPixelArtJSON);
+        }
+
+        function setupAnimationControls() {
+            let animationMode = 'none';
+            const controls = document.getElementById('animation-controls');
+            // ★★★ スライダーと数値表示の要素を取得 ★★★
+            const speedSlider = document.getElementById('anim-speed-slider');
+            const speedDisplay = document.getElementById('anim-speed-display');
+
+            // グリッドの分割線を描画/消去する関数 (内容は変更なし)
+            const updateGridLines = () => {
+                const cells = document.querySelectorAll('.pixel-cell');
+                cells.forEach(cell => {
+                    cell.classList.remove('split-h', 'split-v');
+                });
+
+                if (animationMode === '2frames') { // ★★★ 2分割の条件を追加 ★★★
+                    for (let i = 0; i < PIXEL_GRID_SIZE * PIXEL_GRID_SIZE; i++) {
+                        const y = Math.floor(i / PIXEL_GRID_SIZE);
+                        if (y === 15) cells[i].classList.add('split-v'); // 中央に水平線1本
+                    }
+                } else if (animationMode === '4frames') { // 2x2分割
+                    for (let i = 0; i < PIXEL_GRID_SIZE * PIXEL_GRID_SIZE; i++) {
+                        const x = i % PIXEL_GRID_SIZE;
+                        const y = Math.floor(i / PIXEL_GRID_SIZE);
+                        if (x === 15) cells[i].classList.add('split-h');
+                        if (y === 15) cells[i].classList.add('split-v');
+                    }
+                } else if (animationMode === '6frames') {
+                    for (let i = 0; i < PIXEL_GRID_SIZE * PIXEL_GRID_SIZE; i++) {
+                        const x = i % PIXEL_GRID_SIZE;
+                        const y = Math.floor(i / PIXEL_GRID_SIZE);
+                        if (x === 10 || x === 21) cells[i].classList.add('split-h');
+                        if (y === 15) cells[i].classList.add('split-v');
+                    }
+                }
+            };
+
+            // ラジオボタンのイベントリスナー (内容は変更なし)
+            controls.addEventListener('change', (e) => {
+                if (e.target.name === 'anim-mode') {
+                    animationMode = e.target.value;
+                    updateGridLines();
+                }
+            });
+
+            // ▼▼▼ スライダーのイベントリスナーを追加 ▼▼▼
+            speedSlider.addEventListener('input', () => {
+                // 1. スライダーの値を取得
+                const newSpeed = parseInt(speedSlider.value, 10);
+                // 2. プレイヤーのプロパティを更新
+                player.animationSpeed = newSpeed;
+                // 3. UIの数値を更新
+                speedDisplay.textContent = newSpeed;
+            });
+
+            // ★★★ 初期化処理 ★★★
+            updateGridLines(); // 分割線の初期表示
+            player.animationSpeed = parseInt(speedSlider.value, 10); // プレイヤーの速度を初期化
+            speedDisplay.textContent = player.animationSpeed; // 数値の初期表示
+        }
+
+        function setupSequencer() {
+            const grid = document.getElementById('sequencer-grid');
+            grid.innerHTML = '';
+            Object.keys(PARTS).forEach(partName => {
+                const row = document.createElement('div');
+                row.className = 'part-row';
+
+                const label = document.createElement('div');
+                label.className = 'part-label';
+                label.textContent = partName;
+                row.appendChild(label);
+
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'step-buttons';
+
+                for (let i = 0; i < TOTAL_STEPS; i++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'step-btn';
+                    if (i % STEPS_PER_BEAT === 0) btn.classList.add('beat');
+                    btn.dataset.part = partName;
+                    btn.dataset.step = i;
+
+                    btn.addEventListener('click', () => {
+                        toggleStep(partName, i);
+                        const s = PARTS[partName].sound;
+                        sfx.playSound(s.freq, s.duration, s.vol, s.type, s.freqEnd);
+                    });
+                    buttonsContainer.appendChild(btn);
+                }
+                row.appendChild(buttonsContainer);
+                grid.appendChild(row);
+            });
+
+            document.getElementById('play-pause-btn').addEventListener('click', togglePlay);
+            document.getElementById('clear-sequencer-btn').addEventListener('click', clearSequencer);
+            document.getElementById('save-beat-btn').addEventListener('click', saveBeat);
+            document.getElementById('load-beat-btn').addEventListener('click', () => document.getElementById('beat-file-input').click());
+            document.getElementById('beat-file-input').addEventListener('change', loadBeat);
+            const bpmSlider = document.getElementById('bpm-slider');
+            const bpmDisplay = document.getElementById('bpm-display');
+
+            bpmSlider.addEventListener('input', () => {
+                // 1. BPM変数をスライダーの値で更新
+                BPM = parseInt(bpmSlider.value, 10);
+
+                // 2. 表示されているBPMの数値を更新
+                bpmDisplay.textContent = BPM;
+
+                // 3. もし再生中なら、新しいBPMでシーケンサーを再起動する
+                if (isPlaying) {
+                    stopSequencer();
+                    startSequencer();
+                }
+                updateGameDifficulty();
+            });
+        }
+
+        function toggleStep(partName, step) {
+            PARTS[partName].pattern[step] = 1 - PARTS[partName].pattern[step]; // 0と1を切り替え
+            updateSequencerUI();
+            updateGameDifficulty();
+        }
+
+        function togglePlay() {
+            initAudio();
+            isPlaying = !isPlaying;
+            const btn = document.getElementById('play-pause-btn');
+            if (isPlaying) {
+                btn.textContent = '停止';
+                btn.classList.add('active');
+                currentStep = 0;
+                startSequencer();
+            } else {
+                btn.textContent = '再生';
+                btn.classList.remove('active');
+                stopSequencer();
+            }
+            updateGameDifficulty(); //再生停止でも難易度を更新
+        }
+
+        function clearSequencer() {
+            Object.keys(PARTS).forEach(partName => PARTS[partName].pattern.fill(0));
+            updateSequencerUI();
+            updateGameDifficulty();
+        }
+
+        function startSequencer() {
+            if (sequencerInterval) return;
+            const intervalMs = (60 / BPM) * 1000 / STEPS_PER_BEAT;
+
+            sequencerInterval = setInterval(() => {
+                Object.keys(PARTS).forEach(partName => {
+                    if (PARTS[partName].pattern[currentStep] === 1) {
+                        const s = PARTS[partName].sound;
+                        sfx.playSound(s.freq, s.duration, s.vol, s.type, s.freqEnd);
+                    }
+                });
+                updateSequencerUI();
+                currentStep = (currentStep + 1) % TOTAL_STEPS;
+            }, intervalMs);
+        }
+
+        function stopSequencer() {
+            if (sequencerInterval) {
+                clearInterval(sequencerInterval);
+                sequencerInterval = null;
+            }
+            document.querySelectorAll('.step-btn.playing').forEach(b => b.classList.remove('playing'));
+        }
+
+        function updateSequencerUI() {
+            document.querySelectorAll('.step-btn').forEach(btn => {
+                const part = btn.dataset.part;
+                const step = parseInt(btn.dataset.step, 10);
+                if (PARTS[part].pattern[step] === 1) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+                if (isPlaying && step === currentStep) {
+                    btn.classList.add('playing');
+                } else {
+                    btn.classList.remove('playing');
+                }
+            });
+        }
+
+        function updateGameDifficulty() {
+            let totalActiveNotes = 0;
+            // if (isPlaying) { // ← このif文を削除
+            Object.values(PARTS).forEach(part => {
+                totalActiveNotes += part.pattern.filter(note => note === 1).length;
+            });
+            // } // ← この } を削除
+
+            const baseBpm = 120.0;
+            const bpmFactor = BPM / baseBpm;
+
+            const potentialSpeed = totalActiveNotes * 0.1 * bpmFactor;
+            const potentialMultiplier = 1.0 + (totalActiveNotes * 0.1 * bpmFactor);
+
+            // ★★★ 再生中かどうかに応じて、実際のゲームへの適用を分ける ★★★
+            if (isPlaying) {
+                forcedScrollSpeed = Math.min(potentialSpeed, 5.0);
+                scoreMultiplier = potentialMultiplier;
+            } else {
+                forcedScrollSpeed = 0;
+                // 再生していない時はスコア倍率を1.0に戻す
+                scoreMultiplier = 1.0;
+            }
+
+            // ★★★ UIの表示は常に行う ★★★
+            const speedText = potentialSpeed > 0 ? potentialSpeed.toFixed(1) : 'OFF';
+            document.querySelector('#track-info span:first-child').textContent = `スクロール: ${speedText}`;
+            document.querySelector('#track-info span:last-child').textContent = `スコア倍率: x${potentialMultiplier.toFixed(1)}`;
+        }
+        function setupHelpModal() {
+            const helpButton = document.getElementById('show-help-btn');
+            const helpModal = document.getElementById('help-modal');
+            const closeHelpModalBtn = document.getElementById('close-help-modal');
+            const gameWrapper = document.querySelector('.game-wrapper'); // ★★★ ゲームラッパーを取得 ★★★
+
+            if (!helpButton || !helpModal || !closeHelpModalBtn || !gameWrapper) return;
+
+            const openModal = () => {
+                initAudio();
+                sfx.playSound(523, 0.1, 0.2, 'triangle');
+                helpModal.classList.add('open');
+                player.isHelpOpen = true; // ゲームを停止
+                // ★★★ ゲームラッパーにモーダルを追加 ★★★
+                gameWrapper.appendChild(helpModal);
+            };
+
+            const closeModal = () => {
+                helpModal.classList.remove('open');
+                player.isHelpOpen = false; // ゲームを再開
+                // ★★★ gameWrapperに存在すれば削除 ★★★
+                if (gameWrapper.contains(helpModal)) {
+                    gameWrapper.removeChild(helpModal);
+                }
+            };
+
+            helpButton.addEventListener('click', openModal);
+            closeHelpModalBtn.addEventListener('click', closeModal);
+
+            helpModal.addEventListener('click', (e) => {
+                if (e.target === helpModal) {
+                    closeModal();
+                }
+            });
+
+            // ★★★ bodyではなくラッパーから初期状態で取り除いておく ★★★
+            if (document.body.contains(helpModal)) {
+                document.body.removeChild(helpModal);
+            }
+        }
+
+        // キャラクター情報をオブジェクトとして生成する関数
+        function createCharacterData() {
+            const animationMode = document.querySelector('input[name="anim-mode"]:checked').value;
+            const tempCanvas = getPixelCanvas();
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.getImageData(0, 0, PIXEL_GRID_SIZE, PIXEL_GRID_SIZE);
+            const data = imageData.data;
+            let minX_total = PIXEL_GRID_SIZE, maxX_total = -1, minY_total = PIXEL_GRID_SIZE, maxY_total = -1, hasDrawing = false;
+            for (let i = 0; i < data.length; i += 4) { if (data[i + 3] > 0) { hasDrawing = true; const x = (i / 4) % PIXEL_GRID_SIZE, y = Math.floor((i / 4) / PIXEL_GRID_SIZE); minX_total = Math.min(minX_total, x); maxX_total = Math.max(maxX_total, x); minY_total = Math.min(minY_total, y); maxY_total = Math.max(maxY_total, y); } }
+            if (!hasDrawing) return null;
+
+            let finalWidth, finalHeight;
+            let isAnimated = false, frameCount = 0, frameWidth = 0, frameHeight = 0;
+
+            if (animationMode === 'none') {
+                const effectiveWidth = (maxX_total - minX_total + 1), effectiveHeight = (maxY_total - minY_total + 1), scale = PLAYER_MAX_SIZE / PIXEL_GRID_SIZE;
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveHeight * scale, PLAYER_MAX_SIZE));
+            } else {
+                isAnimated = true;
+                const cols = (animationMode === '6frames') ? 3 : (animationMode === '4frames') ? 2 : 1, rows = 2;
+                frameCount = cols * rows;
+                let maxFramePixelWidth = 0, maxFramePixelHeight = 0;
+                const colWidths = (cols === 3) ? [11, 11, 10] : (cols === 2) ? [16, 16] : [32], rowHeights = [16, 16], colStarts = (cols === 3) ? [0, 11, 22] : (cols === 2) ? [0, 16] : [0], rowStarts = [0, 16];
+                for (let r = 0; r < rows; r++) { for (let c = 0; c < cols; c++) { const cellStartX = colStarts[c], cellStartY = rowStarts[r], cellWidth = colWidths[c], cellHeight = rowHeights[r]; let minX_frame = PIXEL_GRID_SIZE, maxX_frame = -1, minY_frame = PIXEL_GRID_SIZE, maxY_frame = -1, hasDrawingInFrame = false; for (let y = cellStartY; y < cellStartY + cellHeight; y++) { for (let x = cellStartX; x < cellStartX + cellWidth; x++) { const i = (y * PIXEL_GRID_SIZE + x) * 4; if (data[i + 3] > 0) { hasDrawingInFrame = true; minX_frame = Math.min(minX_frame, x); maxX_frame = Math.max(maxX_frame, x); minY_frame = Math.min(minY_frame, y); maxY_frame = Math.max(maxY_frame, y); } } } if (hasDrawingInFrame) { const frameContentWidth = maxX_frame - minX_frame + 1, frameContentHeight = maxY_frame - minY_frame + 1; maxFramePixelWidth = Math.max(maxFramePixelWidth, frameContentWidth); maxFramePixelHeight = Math.max(maxFramePixelHeight, frameContentHeight); } } }
+                frameWidth = Math.ceil((maxX_total - minX_total + 1) / cols);
+                frameHeight = Math.ceil((maxY_total - minY_total + 1) / rows);
+                const scale = PLAYER_MAX_SIZE / (PIXEL_GRID_SIZE / Math.max(cols, rows));
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelHeight * scale, PLAYER_MAX_SIZE));
+            }
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = (maxX_total - minX_total + 1);
+            finalCanvas.height = (maxY_total - minY_total + 1);
+            finalCanvas.getContext('2d').drawImage(tempCanvas, minX_total, minY_total, finalCanvas.width, finalCanvas.height, 0, 0, finalCanvas.width, finalCanvas.height);
+
+            const imageDataUrl = finalCanvas.toDataURL();
+            const img = new Image();
+            img.src = imageDataUrl;
+
+            const colorAbility = analyzeAndApplyImage(img, false);
+
+            return {
+                width: finalWidth, height: finalHeight, isAnimated, image: isAnimated ? null : img, spriteSheet: isAnimated ? img : null,
+                frameCount, frameWidth, frameHeight, colorAbility, imageDataUrl
+            };
+        }
+
+
+        // キャラクターをスロットに保存するメインの関数
+        function saveCharacterToSlot(slotIndex) {
+            initAudio();
+            const charData = createCharacterData();
+            if (!charData) { alert("描画エリアに何も描かれていません。"); return; }
+            player.characterSlots[slotIndex] = charData;
+            const slotElement = document.getElementById(`slot-${slotIndex + 1}`);
+            slotElement.textContent = '';
+            slotElement.style.backgroundImage = `url(${charData.imageDataUrl})`;
+            sfx.itemGet();
+            alert(`スロット${slotIndex + 1}にキャラクターを保存しました！`);
+        }
+
+        function switchCharacter(slotIndex) {
+            if (gameOver || player.isTrading || player.isHelpOpen || !player.characterSlots[slotIndex]) return;
+            const newChar = player.characterSlots[slotIndex];
+            const oldHeight = player.height;
+            Object.assign(player, {
+                width: newChar.width, height: newChar.height, isAnimated: newChar.isAnimated, image: newChar.image,
+                spriteSheet: newChar.spriteSheet, frameCount: newChar.frameCount, currentFrame: 0, frameWidth: newChar.frameWidth,
+                frameHeight: newChar.frameHeight, colorAbility: newChar.colorAbility,
+            });
+            player.y -= (player.height - oldHeight);
+            updatePlayerStats(); // 新しいサイズに合わせてステータスを再計算
+            
+            // ▼▼▼ この2行を追加 ▼▼▼
+            player.shotCooldown = 0; // 射撃クールダウンを完全にリセット
+            player.hoverFuel = player.hoverFuelMax; // ホバー燃料を最大まで回復
+            // ▲▲▲ ここまで ▲▲▲
+
+            sfx.playSound(600, 0.15, 0.3, 'square', 400); // 変身音
+        }
+
+        function createCharacterData() {
+            const animationMode = document.querySelector('input[name="anim-mode"]:checked').value;
+            const tempCanvas = getPixelCanvas();
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.getImageData(0, 0, PIXEL_GRID_SIZE, PIXEL_GRID_SIZE);
+            const data = imageData.data;
+            let minX_total = PIXEL_GRID_SIZE, maxX_total = -1, minY_total = PIXEL_GRID_SIZE, maxY_total = -1, hasDrawing = false;
+            for (let i = 0; i < data.length; i += 4) { if (data[i + 3] > 0) { hasDrawing = true; const x = (i / 4) % PIXEL_GRID_SIZE, y = Math.floor((i / 4) / PIXEL_GRID_SIZE); minX_total = Math.min(minX_total, x); maxX_total = Math.max(maxX_total, x); minY_total = Math.min(minY_total, y); maxY_total = Math.max(maxY_total, y); } }
+            if (!hasDrawing) return null;
+
+            let finalWidth, finalHeight;
+            let isAnimated = false, frameCount = 0, frameWidth = 0, frameHeight = 0;
+
+            if (animationMode === 'none') {
+                const effectiveWidth = (maxX_total - minX_total + 1), effectiveHeight = (maxY_total - minY_total + 1), scale = PLAYER_MAX_SIZE / PIXEL_GRID_SIZE;
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(effectiveHeight * scale, PLAYER_MAX_SIZE));
+            } else {
+                isAnimated = true;
+                const cols = (animationMode === '6frames') ? 3 : (animationMode === '4frames') ? 2 : 1, rows = 2;
+                frameCount = cols * rows;
+                let maxFramePixelWidth = 0, maxFramePixelHeight = 0;
+                const colWidths = (cols === 3) ? [11, 11, 10] : (cols === 2) ? [16, 16] : [32], rowHeights = [16, 16], colStarts = (cols === 3) ? [0, 11, 22] : (cols === 2) ? [0, 16] : [0], rowStarts = [0, 16];
+                for (let r = 0; r < rows; r++) { for (let c = 0; c < cols; c++) { const cellStartX = colStarts[c], cellStartY = rowStarts[r], cellWidth = colWidths[c], cellHeight = rowHeights[r]; let minX_frame = PIXEL_GRID_SIZE, maxX_frame = -1, minY_frame = PIXEL_GRID_SIZE, maxY_frame = -1, hasDrawingInFrame = false; for (let y = cellStartY; y < cellStartY + cellHeight; y++) { for (let x = cellStartX; x < cellStartX + cellWidth; x++) { const i = (y * PIXEL_GRID_SIZE + x) * 4; if (data[i + 3] > 0) { hasDrawingInFrame = true; minX_frame = Math.min(minX_frame, x); maxX_frame = Math.max(maxX_frame, x); minY_frame = Math.min(minY_frame, y); maxY_frame = Math.max(maxY_frame, y); } } } if (hasDrawingInFrame) { const frameContentWidth = maxX_frame - minX_frame + 1, frameContentHeight = maxY_frame - minY_frame + 1; maxFramePixelWidth = Math.max(maxFramePixelWidth, frameContentWidth); maxFramePixelHeight = Math.max(maxFramePixelHeight, frameContentHeight); } } }
+                frameWidth = Math.ceil((maxX_total - minX_total + 1) / cols);
+                frameHeight = Math.ceil((maxY_total - minY_total + 1) / rows);
+                const scale = PLAYER_MAX_SIZE / (PIXEL_GRID_SIZE / Math.max(cols, rows));
+                finalWidth = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelWidth * scale, PLAYER_MAX_SIZE));
+                finalHeight = Math.max(PLAYER_MIN_SIZE, Math.min(maxFramePixelHeight * scale, PLAYER_MAX_SIZE));
+            }
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = (maxX_total - minX_total + 1);
+            finalCanvas.height = (maxY_total - minY_total + 1);
+            finalCanvas.getContext('2d').drawImage(tempCanvas, minX_total, minY_total, finalCanvas.width, finalCanvas.height, 0, 0, finalCanvas.width, finalCanvas.height);
+
+            const imageDataUrl = finalCanvas.toDataURL();
+            const img = new Image();
+            img.src = imageDataUrl;
+
+            // 色の傾向を分析して返す
+            const colorAbility = analyzeAndApplyImage(img); // analyzeAndApplyImageを少し改造する必要がある
+
+            return {
+                width: finalWidth, height: finalHeight, isAnimated, image: isAnimated ? null : img, spriteSheet: isAnimated ? img : null,
+                frameCount, frameWidth, frameHeight, colorAbility, imageDataUrl
+            };
+        }
+
+        function setupCharacterSlots() {
+            // 保存ボタン
+            document.getElementById('save-to-slot-1').addEventListener('click', () => saveCharacterToSlot(0));
+            document.getElementById('save-to-slot-2').addEventListener('click', () => saveCharacterToSlot(1));
+            document.getElementById('save-to-slot-3').addEventListener('click', () => saveCharacterToSlot(2));
+
+            // スロットのクリック/タップによる変身
+            document.getElementById('slot-1').addEventListener('click', () => switchCharacter(0));
+            document.getElementById('slot-2').addEventListener('click', () => switchCharacter(1));
+            document.getElementById('slot-3').addEventListener('click', () => switchCharacter(2));
+        }
+
+        // document.addEventListener('keydown', ...) の中身を修正
+        document.addEventListener('keydown', (e) => {
+            initAudio();
+            // 1, 2, 3キーでの変身
+            if (e.code === 'Digit1') switchCharacter(0);
+            if (e.code === 'Digit2') switchCharacter(1);
+            if (e.code === 'Digit3') switchCharacter(2);
+            keys[e.code] = true;
+        });
+
+        function initializeGame() {
+            initPixelEditor(); // ピクセルエディタを初期化
+            setupSequencer();  // シーケンサーのUIをセットアップ
+            setupPixelArtIO();
+            setupAnimationControls();
+            setupHelpModal();
+            setupCharacterSlots();
+            init();            // ゲームの初回スタート
+        }
+
+        function init() {
+            // シーケンサーの状態は維持する
+            updateGameDifficulty();
+
+            // ★★★ ここからが【プレイヤーの愛着を尊重する】新リセット処理です ★★★
+
+            // 1. まず、現在のキャラクターの性能（特に最大燃料）を再計算させる
+            //    これにより、ゲームオーバー前のキャラクターが使っていた正しい `hoverFuelMax` が確定する
+            updatePlayerStats();
+
+            // 2. 次に、ゲームの状態とプレイヤーの全パラメータを初期値に戻す
+            //    ※ 見た目に関する `image`, `width`, `height`, `colorAbility` は変更しない！
+            Object.assign(player, {
+                x: 100, y: 450, velocityX: 0, velocityY: 0,
+                onGround: false, onLadder: false, angle: 0,
+                shieldRescues: 1, fallRescues: 1, doubleJumps: 1, timeStops: 1, powerUps: 1,
+                invincible: false, invincibleTimer: 0,
+                poweredUp: false, powerUpTimer: 0,
+                shotCooldown: 0,
+                hoverFuel: player.hoverFuelMax, // ★★★ 正しい最大値で全快！ ★★★
+                isTrading: false, isGravityReversing: false, isHelpOpen: false,
+                coyoteTimeCounter: 0
+            });
+
+            // 3. ゲーム全体の変数をリセット
+            score = 0; lastPositionScore = Math.floor(player.x / 10);
+            bossDefeatCount = 0;
+            scoreAtLastBossDefeat = 0;
+            cameraX = 0;
+            gameOver = false;
+            timeLeft = INITIAL_TIME;
+            frameCounter = 0;
+            platforms = []; obstacles = []; ladders = []; groundEnemies = []; airEnemies = []; jumpPads = []; timeCoins = []; shieldRescueItems = []; fallRescueItems = []; doubleJumpItems = []; turrets = []; playerProjectiles = []; enemyProjectiles = []; merchants = []; timeStopItems = []; powerUpItems = []; bossBeams = [];
+            boss = null;
+            bossFightActive = false;
+            nextBossScore = BOSS_SPAWN_SCORE_INTERVAL;
+            isTimeFrozen = false;
+            timeFreezeTimer = 0;
+            gameOverScreen.style.display = 'none';
+            platforms.push({ x: 0, y: GAME_HEIGHT - 40, width: 400, height: 20, type: 'normal' });
+
+            // ★★★ ここまで ★★★
+
+            gameLoop();
+        }
+
+        function update() {
+            if (gameOver || player.isTrading || player.isHelpOpen) return;
+
+            if (player.isAnimated) {
+                player.animationTimer++;
+                if (player.animationTimer >= player.animationSpeed) {
+                    player.animationTimer = 0;
+                    player.currentFrame = (player.currentFrame + 1) % player.frameCount;
+                }
+            }
+
+            bossBeams.forEach((beam, index) => { 
+                beam.lifespan--; 
+                if (beam.lifespan <= 0) { 
+                    bossBeams.splice(index, 1); 
+                } else {
+                    // ★★★ ビームの種類で発射タイミングを分岐 ★★★
+                    const activationThreshold = (beam.type === 'angled') ? 60 : 90; // 射線ビームは60、垂直は90
+                    if (beam.lifespan < activationThreshold) {
+                        beam.state = 'active';
+                    }
+                    
+                    // 垂直ビームの位置をボスに追従させる処理 (射線ビームは発射位置固定なので何もしない)
+                    if (boss && beam.type === 'vertical') { 
+                        beam.x = boss.x; 
+                    } 
+                } 
+            });
+            frameCounter++;
+
+            if (isTimeFrozen) {
+                timeFreezeTimer--;
+                if (timeFreezeTimer <= 0) isTimeFrozen = false;
+            } else {
+                if (frameCounter >= 60) { timeLeft--; frameCounter = 0; }
+                if (timeLeft <= 0) { timeLeft = 0; sfx.gameOver(); gameOver = true; }
+                platforms.forEach((p, index) => { if (p.state === 'shaking') { p.timer--; if (p.timer <= 0) platforms.splice(index, 1); } if (p.type === 'moving_h') { p.x += p.moveSpeed * p.moveDir; if (p.x < p.originalX || p.x > p.originalX + p.moveRange) p.moveDir *= -1; } if (p.type === 'moving_v') { p.y += p.moveSpeed * p.moveDir; if (p.y < p.originalY || p.y > p.originalY + p.moveRange) p.moveDir *= -1; } if (p.type === 'ice_block') { p.lifespan--; if (p.lifespan <= 0) platforms.splice(index, 1); } });
+                [...groundEnemies, ...airEnemies].forEach(e => { if (e.vx) { e.x += e.vx; if (e.x < e.initialX || e.x > e.initialX + e.moveRange) e.vx *= -1; } if (e.vy) { e.y += e.vy; if (e.y < e.initialY || e.y > e.initialY + e.moveRange) e.vy *= -1; } });
+                turrets.forEach(t => { if (Math.abs((t.x + t.width / 2) - (player.x + player.width / 2)) < GAME_WIDTH / 1.5) { t.cooldown--; if (t.cooldown <= 0) { sfx.enemyShoot(); const angle = Math.atan2((player.y + player.height / 2) - (t.y), (player.x + player.width / 2) - (t.x + t.width / 2)); const speed = t.type === 'killer' ? 2 : 4; enemyProjectiles.push({ x: t.x + t.width / 2, y: t.y, radius: 5, type: t.type, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, lifespan: 600 }); t.cooldown = 180 + Math.random() * 120; } } });
+                for (let i = enemyProjectiles.length - 1; i >= 0; i--) { const p = enemyProjectiles[i]; if (p.type === 'killer') { const angle = Math.atan2((player.y + player.height / 2) - p.y, (player.x + player.width / 2) - p.x); p.vx += Math.cos(angle) * 0.05; p.vy += Math.sin(angle) * 0.05; p.vx *= 0.99; p.vy *= 0.99; } p.x += p.vx; p.y += p.vy; p.lifespan--; if (p.lifespan <= 0) enemyProjectiles.splice(i, 1); }
+            }
+
+            if (player.poweredUp) { player.powerUpTimer--; if (player.powerUpTimer <= 0) player.poweredUp = false; }
+            if (player.invincible) { player.invincibleTimer--; if (player.invincibleTimer <= 0) player.invincible = false; }
+            if (player.shotCooldown > 0) { player.shotCooldown = Math.max(0, player.shotCooldown - 1); }
+            if (player.coyoteTimeCounter > 0) { player.coyoteTimeCounter--; }
+
+            if (score >= scoreAtLastBossDefeat + BOSS_SPAWN_SCORE_INTERVAL && !bossFightActive) { spawnBoss(); }
+            if (bossFightActive && boss) {
+                if (boss.partDesigns && boss.partDesigns.length > 0) {
+                    if (!isTimeFrozen) {
+                        boss.rotation += BOSS_ROTATION_SPEED;
+                        if (frameCounter % 180 === 0) { boss.targetY = Math.random() * (GAME_HEIGHT - 200) + 100; }
+                        const yDiff = boss.targetY - boss.y;
+                        boss.yVelocity += yDiff * 0.0005;
+                        boss.yVelocity *= 0.95;
+                        boss.y += boss.yVelocity;
+
+                        // ★★★ ここからが【画面右の支配者AI】です ★★★
+                        if (forcedScrollSpeed > 0) {
+                            // 強制スクロール中は、画面の右端に位置を固定する
+                            // ボスの最も右側のパーツが、画面の右端から少しはみ出すくらいの位置
+                            const targetX = cameraX + GAME_WIDTH - boss.size * 0.8;
+                            // 常に目標位置に向かって滑らかに移動する
+                            boss.x += (targetX - boss.x) * 0.1;
+                        } else {
+                            // 通常時は、これまで通りプレイヤーを追いかける
+                            if (player.x + player.width / 2 < boss.x) {
+                                boss.x = Math.max(player.x + player.width, boss.x - boss.speed);
+                            }
+                        }
+                        boss.fireCooldown--;
+if (boss.fireCooldown <= 0) {
+                            const livingParts = boss.partDesigns.filter(p => p.alive);
+                            if (livingParts.length > 0) {
+                                const difficultyLevel = bossDefeatCount;
+                                const attackChoice = Math.random();
+
+                                // 30%の確率で「垂直ビーム」
+                                if (attackChoice < 0.3) {
+                                    sfx.playSound(100, 1.5, 0.4, 'sawtooth', 50);
+                                    let minX = Infinity, maxX = -Infinity;
+                                    livingParts.forEach(p => { const radius = p.isCorner ? boss.size : boss.size / 2; const x = boss.x + Math.cos(p.angle + boss.rotation) * radius; minX = Math.min(minX, x); maxX = Math.max(maxX, x); });
+                                    const calculatedWidth = (maxX - minX) * 1.2;
+                                    const beamWidth = Math.max(calculatedWidth, BOSS_PART_SIZE);
+                                    bossBeams.push({ x: boss.x, y: 0, width: beamWidth, height: GAME_HEIGHT, lifespan: 120, state: 'charging', type: 'vertical' }); // Y座標は無視される
+                                    boss.fireCooldown = 240 + Math.random() * 120;
+
+                                // 30%の確率で「射線ビーム」 (NEW!)
+                                } else if (attackChoice < 0.6) {
+                                    sfx.playSound(120, 1.0, 0.4, 'sine', 80);
+                                    const beamThickness = 30; // ビームの太さ
+                                    const beamLength = GAME_WIDTH * 1.5; // 画面を貫通するのに十分な長さ
+
+                                    // ランダムな生きているパーツを１つ選ぶ
+                                    const partToFireFrom = livingParts[Math.floor(Math.random() * livingParts.length)];
+                                    const radius = partToFireFrom.isCorner ? boss.size : boss.size / 2;
+                                    const partX = boss.x + Math.cos(partToFireFrom.angle + boss.rotation) * radius;
+                                    const partY = boss.y + Math.sin(partToFireFrom.angle + boss.rotation) * radius;
+
+                                    // そのパーツからプレイヤーの中心への角度を計算
+                                    const angle = Math.atan2((player.y + player.height / 2) - partY, (player.x + player.width / 2) - partX);
+
+                                    bossBeams.push({ x: partX, y: partY, length: beamLength, thickness: beamThickness, angle: angle, lifespan: 120, state: 'charging', type: 'angled' });
+                                    boss.fireCooldown = 180 + Math.random() * 80;
+
+
+                                    // 残りの40%の確率で「通常弾」
+                                } else {
+                                    const minAttackers = Math.min(1 + difficultyLevel, Math.floor(livingParts.length / 2));
+                                    const maxAttackers = Math.min(2 + difficultyLevel * 2, livingParts.length);
+                                    const numToFire = Math.floor(Math.random() * (maxAttackers - minAttackers + 1)) + minAttackers;
+                                    let availableParts = [...livingParts];
+                                    for (let i = 0; i < numToFire; i++) { if (availableParts.length === 0) break; const partIndex = Math.floor(Math.random() * availableParts.length); const partDesignToFire = availableParts.splice(partIndex, 1)[0]; const radius = partDesignToFire.isCorner ? boss.size : boss.size / 2; const partX = boss.x + Math.cos(partDesignToFire.angle + boss.rotation) * radius; const partY = boss.y + Math.sin(partDesignToFire.angle + boss.rotation) * radius; sfx.enemyShoot(); const bulletType = Math.random() < 0.3 ? 'killer' : 'cannon'; const speed = bulletType === 'killer' ? 2 : 4; const angle = Math.atan2((player.y + player.height / 2) - (partY + BOSS_PART_SIZE / 2), (player.x + player.width / 2) - (partX + BOSS_PART_SIZE / 2)); enemyProjectiles.push({ x: partX + BOSS_PART_SIZE / 2, y: partY + BOSS_PART_SIZE / 2, radius: 8, type: bulletType, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, lifespan: 600 }); }
+                                    const baseCooldown = Math.max(80, 200 - difficultyLevel * 20);
+                                    boss.fireCooldown = baseCooldown + Math.random() * 100;
+                                }
+                            }
+                        }
+                    }
+                    for (let i = playerProjectiles.length - 1; i >= 0; i--) { const p = playerProjectiles[i]; let collided = false; for (let j = boss.partDesigns.length - 1; j >= 0; j--) { const partDesign = boss.partDesigns[j]; if (!partDesign.alive) continue; const radius = partDesign.isCorner ? boss.size : boss.size / 2; const partX = boss.x + Math.cos(partDesign.angle + boss.rotation) * radius; const partY = boss.y + Math.sin(partDesign.angle + boss.rotation) * radius; if (Math.hypot(p.x - (partX + BOSS_PART_SIZE / 2), p.y - (partY + BOSS_PART_SIZE / 2)) < p.radius + BOSS_PART_SIZE / 2) { const attackPower = p.damage || 1; partDesign.hp -= attackPower; sfx.enemyDefeat(); collided = true; if (partDesign.hp <= 0) { partDesign.alive = false; const partScore = BOSS_SCORE_PER_PART * partDesign.initialHp; score += partScore; if (p.type === 'ice') { platforms.push({ x: partX, y: partY, width: BOSS_PART_SIZE, height: BOSS_PART_SIZE, type: 'ice_block', lifespan: 300 }); } } break; } } if (collided && p.damage <= 1) { playerProjectiles.splice(i, 1); } }
+                    if (boss.partDesigns.every(p => !p.alive)) { const completionBonus = boss.initialPartsCount * BOSS_SCORE_PER_PART * 0.5; score += completionBonus; sfx.bossDefeat(); boss = null; bossFightActive = false; scoreAtLastBossDefeat = score; bossDefeatCount++; }
+                }
+                if (boss && !isTimeFrozen && player.x > boss.x + boss.size + GAME_WIDTH / 2) { boss = null; bossFightActive = false; }
+            }
+
+            for (let i = playerProjectiles.length - 1; i >= 0; i--) { const p = playerProjectiles[i]; p.x += p.vx; p.y += p.vy; if (Math.hypot(p.x - player.x, p.y - player.y) > GAME_WIDTH) playerProjectiles.splice(i, 1); }
+
+            const wasOnGround = player.onGround;
+            let onTopOfLadder = false, canClimbLadder = false, onIce = false;
+            platforms.forEach(p => { if (player.onGround && player.x + player.width > p.x && player.x < p.x + p.width && Math.abs((player.y + player.height) - p.y) < 5) { onIce = p.type === 'ice'; } });
+            ladders.forEach(l => { const isOverLadder = player.x + player.width > l.x && player.x < l.x + l.width; if (isOverLadder) { if (Math.abs((player.y + player.height) - l.y) < 5) onTopOfLadder = true; if (player.y + player.height > l.y && player.y < l.y + l.height) canClimbLadder = true; } });
+            if (canClimbLadder && !onTopOfLadder && (keys['KeyW'] || keys['ArrowUp'] || keys['Space'])) player.onLadder = true;
+            if (!canClimbLadder) player.onLadder = false;
+            const currentSpeed = (player.y + player.height < GAME_HEIGHT / 2) ? player.speed * windFactor : player.speed;
+            if (keys['KeyA'] || keys['ArrowLeft']) { const effectiveSpeed = (forcedScrollSpeed > 0) ? currentSpeed * 0.5 : currentSpeed; player.velocityX = onIce ? player.velocityX - (effectiveSpeed * 0.05) : -effectiveSpeed; player.facing = -1; }
+            else if (keys['KeyD'] || keys['ArrowRight']) { player.velocityX = onIce ? player.velocityX + (currentSpeed * 0.05) : currentSpeed; player.facing = 1; }
+            else { if (onIce) player.velocityX *= 0.98; else player.velocityX = 0; }
+            player.velocityX = Math.max(-currentSpeed, Math.min(currentSpeed, player.velocityX));
+            const jumpPressed = keys['KeyW'] || keys['ArrowUp'] || keys['Space'];
+            if (player.onLadder) {
+                player.velocityY = 0;
+                if (keys['KeyW'] || keys['ArrowUp'] || keys['Space']) {
+                    player.y -= 2.5;
+                }
+                if (jumpPressed && !jumpKeyPressedLastFrame) {
+                    player.onLadder = false;
+                    player.velocityY = -player.jumpPower;
+                    sfx.jump();
+                }
+            }
+            else { if (jumpPressed && !jumpKeyPressedLastFrame) { if (player.onGround || onTopOfLadder || player.coyoteTimeCounter > 0) { player.velocityY = -player.jumpPower; player.onGround = false; player.coyoteTimeCounter = 0; sfx.jump(); } else if (player.doubleJumps > 0) { player.velocityY = -player.jumpPower; player.doubleJumps--; sfx.doubleJump(); } } if (player.isGravityReversing) { player.velocityY -= (gravity * 0.1 * (player.poweredUp ? 1.5 : 1.0)); player.onGround = false; } else { player.velocityY += gravity; } }
+            const actionPressed = keys['ShiftLeft'] || keys['KeyX'];
+            if (player.colorAbility === 'neutral') { if (actionPressed && player.onGround && player.hoverFuel > 0) { player.isGravityReversing = true; } else if (!actionPressed || player.hoverFuel <= 0) { player.isGravityReversing = false; } }
+            if (actionPressed) { let damage = 1; let projectileSize = Math.max(4, Math.min(8 * ((player.width * player.height) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT)), 16)); if (player.poweredUp) { projectileSize *= 2; damage = 2; } let projectileSpeed = Math.max(4, Math.min(12 / ((player.width * player.height) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT)), 16)); const firePitch = 150 / ((player.width * player.height) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT)); const icePitch = 600 * ((player.width * player.height) / (PLAYER_DEFAULT_WIDTH * PLAYER_DEFAULT_HEIGHT)); switch (player.colorAbility) { case 'warm': if (player.shotCooldown <= 0) { playerProjectiles.push({ x: player.x + player.width / 2, y: player.y + player.height / 2, radius: projectileSize, type: 'fire', vx: projectileSpeed * player.facing, vy: 0, damage: damage }); player.shotCooldown = player.shotCooldownMax.fire; sfx.shootFire(firePitch); } break; case 'cool': if (player.shotCooldown <= 0) { playerProjectiles.push({ x: player.x + player.width / 2, y: player.y + player.height / 2, radius: projectileSize, type: 'ice', vx: projectileSpeed * player.facing, vy: 0, damage: damage }); player.shotCooldown = player.shotCooldownMax.ice; sfx.shootIce(icePitch); } break; case 'neutral': if (!player.onGround && !player.isGravityReversing && player.hoverFuel > 0) { player.velocityY *= player.poweredUp ? 0.5 : 0.6; player.hoverFuel--; } break; } }
+            if (player.isGravityReversing) { if (player.hoverFuel > 0) player.hoverFuel--; } else if (!actionPressed && player.hoverFuel < player.hoverFuelMax) { if (player.hoverFuel < player.hoverFuelMax) player.hoverFuel += player.hoverRefillRate; }
+            player.x += player.velocityX; player.y += player.velocityY; player.onGround = false;
+
+            const CEILING_Y = 0; // 画面の一番上
+            if (player.y < CEILING_Y) {
+                player.y = CEILING_Y; // 天井に張り付かせる
+                // 上昇中なら、勢いを止める
+                if (player.velocityY < 0) {
+                    player.velocityY = 0;
+                }
+            }
+
+            if (forcedScrollSpeed > 0) { player.x = Math.max(player.x, cameraX); const rightWall = cameraX + GAME_WIDTH; if (player.x + player.width > rightWall) { player.x = rightWall - player.width; } }
+            platforms.forEach(p => { if (player.velocityY >= 0 && player.x < p.x + p.width && player.x + player.width > p.x && player.y + player.height > p.y && player.y + player.height < p.y + 25) { player.y = p.y - player.height; player.velocityY = 0; player.onGround = true; player.onLadder = false; if (p.type === 'fragile') p.state = 'shaking'; if (p.type.startsWith('moving') && !isTimeFrozen) { player.x += (p.type === 'moving_h' ? p.moveSpeed * p.moveDir : 0); player.y += (p.type === 'moving_v' ? p.moveSpeed * p.moveDir : 0); } } if (player.y + player.height > p.y && player.y < p.y + p.height) { if (player.velocityX < 0 && player.x > p.x && player.x < p.x + p.width + 5) { player.x = p.x + p.width; player.velocityX = 0; } if (player.velocityX > 0 && player.x + player.width > p.x - 5 && player.x + player.width < p.x) { player.x = p.x - player.width; player.velocityX = 0; } } });
+            ladders.forEach(l => { if (player.velocityY >= 0 && !player.onLadder && player.x + player.width > l.x && player.x < l.x + l.width && player.y + player.height > l.y && player.y + player.height < l.y + 20) { player.y = l.y - player.height; player.velocityY = 0; player.onGround = true; } });
+            jumpPads.forEach(jp => { if (player.velocityY >= 0 && player.x < jp.x + jp.width && player.x + player.width > jp.x && player.y + player.height > jp.y && player.y + player.height < jp.y + 20) { player.velocityY = -player.jumpPower * JUMP_PAD_BOOST; sfx.jump(); } });
+            turrets.forEach(t => { if (player.velocityY >= 0 && player.x < t.x + t.width && player.x + player.width > t.x && player.y + player.height > t.y && player.y + player.height < t.y + 25) { player.y = t.y - player.height; player.velocityY = 0; player.onGround = true; } if (player.y + player.height > t.y && player.y < t.y + t.height) { if (player.velocityX < 0 && player.x > t.x && player.x < t.x + t.width) { player.x = t.x + t.width; player.velocityX = 0; } if (player.velocityX > 0 && player.x + player.width > t.x && player.x + player.width < t.x + t.width) { player.x = t.x - player.width; player.velocityX = 0; } } });
+            if (wasOnGround && !player.onGround) { player.coyoteTimeCounter = COYOTE_TIME_FRAMES; }
+            for (let i = merchants.length - 1; i >= 0; i--) { const m = merchants[i]; if (player.x < m.x + m.width && player.x + player.width > m.x && player.y < m.y + m.height && player.y + player.height > m.y) { if (actionPressed && !actionKeyPressedLastFrame) { player.isTrading = true; showTradeMenu(m, i); return; } } }
+            const useItem = () => { if (player.timeStops > 0) { player.timeStops--; isTimeFrozen = true; timeFreezeTimer = 300; sfx.timeStop(); } if (player.powerUps > 0) { player.powerUps--; player.poweredUp = true; player.powerUpTimer = 240; sfx.powerUp(); } };
+            const checkItemCollision = (itemArr, onCollect) => { itemArr.forEach((item, index) => { const dist = Math.hypot(player.x + player.width / 2 - item.x, player.y + player.height / 2 - item.y); if (dist < player.width / 2 + item.radius) { onCollect(); itemArr.splice(index, 1); sfx.itemGet(); } }); };
+            checkItemCollision(timeCoins, () => { timeLeft += COIN_TIME_BONUS; }); checkItemCollision(shieldRescueItems, () => player.shieldRescues = Math.min(5, player.shieldRescues + 1)); checkItemCollision(fallRescueItems, () => player.fallRescues = Math.min(5, player.fallRescues + 1)); checkItemCollision(doubleJumpItems, () => player.doubleJumps = Math.min(5, player.doubleJumps + 1)); checkItemCollision(timeStopItems, () => player.timeStops = Math.min(5, player.timeStops + 1)); checkItemCollision(powerUpItems, () => player.powerUps = Math.min(5, player.powerUps + 1));
+            for (let i = playerProjectiles.length - 1; i >= 0; i--) { const p = playerProjectiles[i]; if (!p) continue; let projectileHit = false; const checkStandardCollision = (enemyArray, isObstacle = false) => { for (let j = enemyArray.length - 1; j >= 0; j--) { const e = enemyArray[j]; if (!e) continue; const entityWidth = e.width || e.radius * 2; const entityHeight = e.height || e.radius * 2; if (Math.hypot(p.x - (e.x + entityWidth / 2), p.y - (e.y + entityHeight / 2)) < p.radius + entityWidth / 2) { if (p.type === 'fire') { enemyArray.splice(j, 1); if (!isObstacle) score += 50; } else if (p.type === 'ice') { platforms.push({ x: e.x, y: e.y, width: entityWidth, height: entityHeight, type: 'ice_block', lifespan: 300 }); enemyArray.splice(j, 1); if (!isObstacle) score += 50; } sfx.enemyDefeat(); return true; } } return false; }; const checkTurretCollision = () => { for (let j = turrets.length - 1; j >= 0; j--) { const t = turrets[j]; if (!t) continue; if (Math.hypot(p.x - (t.x + t.width / 2), p.y - (t.y + t.height / 2)) < p.radius + t.width / 2) { if (p.type === 'fire') { turrets.splice(j, 1); score += 50; } else if (p.type === 'ice') { platforms.push({ x: t.x, y: t.y, width: t.width, height: t.height, type: 'ice_block', lifespan: 300 }); turrets.splice(j, 1); } sfx.enemyDefeat(); return true; } } return false; }; if (checkStandardCollision(groundEnemies)) projectileHit = true; else if (checkStandardCollision(airEnemies)) projectileHit = true; else if (checkTurretCollision()) projectileHit = true; else if (checkStandardCollision(obstacles, true)) projectileHit = true; else if (checkStandardCollision(enemyProjectiles, true)) projectileHit = true; if (projectileHit && p.damage <= 1) { playerProjectiles.splice(i, 1); } }
+            if (!player.invincible) {
+                const handleDamage = () => { if (player.shieldRescues > 0) { player.shieldRescues--; player.invincible = true; player.invincibleTimer = 120; useItem(); sfx.shieldUse(); return false; } return true; };[...groundEnemies, ...airEnemies].forEach((e) => { if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) { if (player.velocityY >= 0 && (player.y + player.height) < e.y + 25) { player.velocityY = -player.jumpPower; score += 50; sfx.enemyDefeat(); if (e.vx !== undefined) { groundEnemies.splice(groundEnemies.indexOf(e), 1); } else { airEnemies.splice(airEnemies.indexOf(e), 1); } } else if (handleDamage()) { sfx.gameOver(); gameOver = true; } } }); obstacles.forEach(o => { if (player.x < o.x + o.width && player.x + player.width > o.x && player.y < o.y + o.height && player.y + player.height > o.y) { if (handleDamage()) { sfx.gameOver(); gameOver = true; } } }); enemyProjectiles.forEach((p, i) => { if (Math.hypot(p.x - (player.x + player.width / 2), p.y - (player.y + player.height / 2)) < p.radius + player.width / 2) { if (handleDamage()) { sfx.gameOver(); gameOver = true; } else { enemyProjectiles.splice(i, 1); } } }); if (boss && !gameOver) { for (const partDesign of boss.partDesigns) { if (partDesign.alive) { const radius = partDesign.isCorner ? boss.size : boss.size / 2; const partX = boss.x + Math.cos(partDesign.angle + boss.rotation) * radius; const partY = boss.y + Math.sin(partDesign.angle + boss.rotation) * radius; if (player.x < partX + BOSS_PART_SIZE && player.x + player.width > partX && player.y < partY + BOSS_PART_SIZE && player.y + player.height > partY) { if (handleDamage()) { sfx.gameOver(); gameOver = true; break; } } } } } // update()関数の中、プレイヤーの当たり判定部分
+           bossBeams.forEach(beam => {
+                if (beam.state !== 'active') return;
+
+                if (beam.type === 'vertical') {
+                    const beamX = beam.x - beam.width / 2;
+                    if (player.x + player.width > beamX && player.x < beamX + beam.width) {
+                        if (handleDamage()) { sfx.gameOver(); gameOver = true; }
+                    }
+                } else if (beam.type === 'angled') {
+                    // ★★★ 回転したビームとの当たり判定（少し複雑です） ★★★
+                    // プレイヤーの中心座標
+                    const playerCenterX = player.x + player.width / 2;
+                    const playerCenterY = player.y + player.height / 2;
+
+                    // プレイヤーの中心を、ビームのローカル座標に変換（ビームを原点・無回転に戻す）
+                    const dx = playerCenterX - beam.x;
+                    const dy = playerCenterY - beam.y;
+                    const rotatedX = dx * Math.cos(-beam.angle) - dy * Math.sin(-beam.angle);
+                    const rotatedY = dx * Math.sin(-beam.angle) + dy * Math.cos(-beam.angle);
+
+                    // ビームの矩形内に入っているか判定
+                    if (rotatedX >= 0 && rotatedX <= beam.length && Math.abs(rotatedY) <= beam.thickness / 2 + player.width / 2) {
+                        if (handleDamage()) { sfx.gameOver(); gameOver = true; }
+                    }
+                }
+            });
+            }
+            if (player.y > GAME_HEIGHT + 100) { if (player.fallRescues > 0) { player.fallRescues--; useItem(); player.y = 0; player.x = cameraX + GAME_WIDTH / 2; player.velocityY = 0; sfx.fallUse(); } else { sfx.gameOver(); gameOver = true; } }
+            if (forcedScrollSpeed > 0 && player.x + player.width < cameraX - GAME_WIDTH * 2) { sfx.gameOver(); gameOver = true; }
+            const oldCameraX = cameraX;
+            const oldPlayerX = player.x; // ★★★ 更新前のプレイヤーX座標を記憶 ★★★
+
+            if (forcedScrollSpeed > 0) {
+                cameraX += forcedScrollSpeed;
+                const boost = (player.x - (cameraX + GAME_WIDTH / 2)) * 0.05;
+                if (player.x > cameraX + GAME_WIDTH / 2) cameraX += boost;
+
+            } else {
+                cameraX = player.x - (GAME_WIDTH / 2);
+            }
+            // 1. 現在のX座標を10で割って、現在のスコア基準値を取得
+            const currentPositionScore = Math.floor(player.x / 10);
+
+            // 2. 前回の基準値との差分を計算（プラスなら前進、マイナスなら後退）
+            const positionDifference = currentPositionScore - lastPositionScore;
+
+            // 3. 差分があればスコアに反映させる
+            if (positionDifference !== 0) {
+                // スコア倍率を考慮したスコアの増減量を計算
+                const scoreChange = Math.round(positionDifference * scoreMultiplier);
+
+                // スコアを更新（ただし0未満にはならないようにする）
+                score = Math.max(0, score + scoreChange);
+            }
+
+            // 4. 今回の基準値を「前回の基準値」として保存し、次のフレームに備える
+            lastPositionScore = currentPositionScore;
+            document.getElementById('shield-rescues-count').textContent = player.shieldRescues; document.getElementById('fall-rescues-count').textContent = player.fallRescues; document.getElementById('double-jumps-count').textContent = player.doubleJumps; document.getElementById('time-stops-count').textContent = player.timeStops; document.getElementById('power-ups-count').textContent = player.powerUps;
+            jumpKeyPressedLastFrame = jumpPressed;
+            actionKeyPressedLastFrame = actionPressed;
+            generateWorld();
+        }
+        function draw() {
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            if (isTimeFrozen && timeFreezeTimer > 0) {
+                const progress = timeFreezeTimer / 900;
+                const r = Math.floor(127 + (135 - 127) * (1 - progress));
+                const g = Math.floor(140 + (206 - 140) * (1 - progress));
+                const b = Math.floor(141 + (235 - 141) * (1 - progress));
+                canvas.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+            } else {
+                canvas.style.backgroundColor = '#87ceeb';
+            }
+
+            if (!gameOver && timeLeft <= 10) {
+                const blinkSpeed = Math.max(4, 12 - (10 - timeLeft));
+                if (frameCounter % blinkSpeed < blinkSpeed / 2) {
+                    canvas.style.borderColor = '#836d48';
+                    canvas.style.borderWidth = '4px';
+                } else {
+                    canvas.style.borderColor = '#c0392b';
+                    canvas.style.borderWidth = '2px';
+                }
+            } else {
+                canvas.style.borderColor = '#000';
+                canvas.style.borderWidth = '2px';
+            }
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([10, 15]); ctx.beginPath(); ctx.moveTo(cameraX, GAME_HEIGHT / 2); ctx.lineTo(cameraX + GAME_WIDTH, GAME_HEIGHT / 2); ctx.stroke(); ctx.setLineDash([]);
+
+            platforms.forEach(p => {
+                if (p.type === 'ice_block') {
+                    ctx.globalAlpha = p.lifespan / 300;
+                    ctx.fillStyle = '#1e90ff';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.x, p.y, p.width, p.height);
+                    ctx.globalAlpha = 1;
+                } else {
+                    if (p.type === 'ice') ctx.fillStyle = '#a2e0ff';
+                    else if (p.type === 'fragile') ctx.fillStyle = p.state === 'shaking' && frameCounter % 10 < 5 ? '#c03b2b' : '#e67e22';
+                    else if (p.type.startsWith('moving')) ctx.fillStyle = '#576574';
+                    else ctx.fillStyle = '#27ae60';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+                }
+            });
+            jumpPads.forEach(jp => { ctx.fillStyle = '#9b59b6'; ctx.fillRect(jp.x, jp.y, jp.width, jp.height); });
+            ladders.forEach(l => { ctx.fillStyle = '#cd853f'; for (let i = 0; i < l.height / 20; i++) ctx.fillRect(l.x, l.y + i * 20, l.width, 5); });
+            ctx.fillStyle = '#f1c40f'; ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 2; timeCoins.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+            ctx.font = '24px Arial'; ctx.textAlign = 'center'; shieldRescueItems.forEach(item => { ctx.fillText('🛡️', item.x, item.y + item.radius / 2); }); fallRescueItems.forEach(item => { ctx.fillText('🕊️', item.x, item.y + item.radius / 2); }); doubleJumpItems.forEach(item => { ctx.fillText('🪶', item.x, item.y + item.radius / 2); }); timeStopItems.forEach(item => { ctx.fillText('⏳', item.x, item.y + item.radius / 2); }); powerUpItems.forEach(item => { ctx.fillText('🔥', item.x, item.y + item.radius / 2); });
+
+            if (player.poweredUp) { ctx.save(); ctx.globalAlpha = Math.min(1.0, player.powerUpTimer / 120) * 0.7; ctx.fillStyle = '#FFD700'; const auraSize = Math.max(player.width, player.height) * 1.5; ctx.beginPath(); ctx.arc(player.x + player.width / 2, player.y + player.height / 2, auraSize / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+            if (!player.invincible || frameCounter % 10 < 5) {
+                ctx.save();
+                ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+                ctx.scale(player.facing, 1);
+                ctx.imageSmoothingEnabled = false;
+
+                // ★★★ アニメーションするかどうかで描画を分岐 ★★★
+                if (player.isAnimated && player.spriteSheet) {
+                    // ▼▼▼ この一行を修正 ▼▼▼
+                    const cols = (player.frameCount === 6) ? 3 : (player.frameCount === 4) ? 2 : 1;
+                    const sx = (player.currentFrame % cols) * player.frameWidth;
+                    const sy = Math.floor(player.currentFrame / cols) * player.frameHeight;
+
+                    ctx.drawImage(player.spriteSheet,
+                        sx, sy, player.frameWidth, player.frameHeight,
+                        -player.width / 2, -player.height / 2, player.width, player.height
+                    );
+
+                } else if (player.image) { // 通常の画像
+                    ctx.drawImage(player.image, -player.width / 2, -player.height / 2, player.width, player.height);
+
+                } else { // デフォルトの四角
+                    player.color = (player.y + player.height < GAME_HEIGHT / 2) ? '#1abc9c' : '#000000';
+                    ctx.fillStyle = player.color;
+                    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+                }
+
+                // 追い風エフェクト (共通)
+                if ((player.image || player.spriteSheet) && player.y + player.height < GAME_HEIGHT / 2) {
+                    ctx.globalAlpha = 0.4;
+                    ctx.fillStyle = '#1abc9c';
+                    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+                    ctx.globalAlpha = 1.0;
+                }
+                ctx.restore();
+            }
+            ctx.fillStyle = '#34495e'; groundEnemies.forEach(e => ctx.fillRect(e.x, e.y, e.width, e.height));
+            ctx.fillStyle = '#9b59b6'; airEnemies.forEach(e => { ctx.beginPath(); ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, 0, Math.PI * 2); ctx.fill(); });
+            turrets.forEach(t => { ctx.fillStyle = '#836d48'; ctx.fillRect(t.x, t.y, t.width, t.height); });
+            ctx.fillStyle = '#836d48';
+            obstacles.forEach(o => { ctx.beginPath(); ctx.moveTo(o.x, o.y + o.height); ctx.lineTo(o.x + o.width / 2, o.y); ctx.lineTo(o.x + o.width, o.y + o.height); ctx.closePath(); ctx.fill(); });
+            playerProjectiles.forEach(p => { ctx.fillStyle = p.type === 'fire' ? 'rgba(255, 69, 0, 0.8)' : 'rgba(100, 180, 255, 0.9)'; ctx.strokeStyle = p.type === 'fire' ? '#ff0' : '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+            enemyProjectiles.forEach(p => { ctx.fillStyle = 'rgba(80, 80, 80, 0.9)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); });
+            merchants.forEach(m => { ctx.fillStyle = '#DAA520'; ctx.fillRect(m.x, m.y, m.width, m.height); ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.beginPath(); ctx.arc(m.x + m.width / 2, m.y + m.height / 2, 50, 0, Math.PI * 2); ctx.fill(); });
+
+            if (bossFightActive && boss) { const hpColors = ['#c0392b', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#e91e63', '#ecf0f1', '#95a5a6', '#34495e']; boss.partDesigns.forEach(partDesign => { if (partDesign.alive) { const radius = partDesign.isCorner ? boss.size : boss.size / 2; const x = boss.x + Math.cos(partDesign.angle + boss.rotation) * radius; const y = boss.y + Math.sin(partDesign.angle + boss.rotation) * radius; ctx.fillStyle = hpColors[Math.min(partDesign.hp - 1, hpColors.length - 1)] || '#c0392b'; ctx.fillRect(x, y, BOSS_PART_SIZE, BOSS_PART_SIZE); } }); }
+            bossBeams.forEach(beam => {
+                if (boss) {
+                    ctx.globalAlpha = beam.lifespan / 120;
+                    if (beam.state === 'charging') {
+                        ctx.fillStyle = (frameCounter % 10 < 5) ? 'rgba(255, 100, 100, 0.5)' : 'rgba(255, 0, 0, 0.7)';
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    }
+
+                    // ★★★ ビームの種類で描画を分岐 ★★★
+                  if (beam.type === 'vertical') {
+                        // ★★★ X座標の計算を修正し、画面端まで届くようにする ★★★
+                        const beamX = beam.x - beam.width / 2;
+                        ctx.fillRect(beamX, 0, beam.width, boss.y - boss.size - 20);
+                        ctx.fillRect(beamX, boss.y + boss.size + 20, beam.width, GAME_HEIGHT);
+                    } else if (beam.type === 'angled') {
+                        // ★★★ 回転描画処理 ★★★
+                        ctx.save();
+                        ctx.translate(beam.x, beam.y); // ビームの根元に移動
+                        ctx.rotate(beam.angle); // 計算した角度に回転
+                        ctx.fillRect(0, -beam.thickness / 2, beam.length, beam.thickness); // ビームを描画
+                        ctx.restore();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+            });
+
+            ctx.restore();
+
+            // --- ここからが画面固定UIの描画 (ctxを使用するように修正) ---
+            if (player.colorAbility === 'neutral' && player.hoverFuel < player.hoverFuelMax) { const gaugeWidth = 50; const gaugeHeight = 8; const gaugeX = (player.x + player.width / 2) - cameraX - gaugeWidth / 2; const gaugeY = player.y - gaugeHeight - 5; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(gaugeX, gaugeY, gaugeWidth, gaugeHeight); ctx.fillStyle = player.hoverFuel > player.hoverFuelMax * 0.25 ? '#2ecc71' : '#836d48'; ctx.fillRect(gaugeX, gaugeY, gaugeWidth * (player.hoverFuel / player.hoverFuelMax), gaugeHeight); }
+            if ((player.colorAbility === 'warm' || player.colorAbility === 'cool') && player.shotCooldown > 0) { const gaugeWidth = 50; const gaugeHeight = 8; const gaugeX = (player.x + player.width / 2) - cameraX - gaugeWidth / 2; const gaugeY = player.y - gaugeHeight - 5; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(gaugeX, gaugeY, gaugeWidth, gaugeHeight); const cooldownMax = (player.colorAbility === 'warm') ? player.shotCooldownMax.fire : player.shotCooldownMax.ice; const gaugeColor = (player.colorAbility === 'warm') ? '#ff6347' : '#1e90ff'; const progress = player.shotCooldown / cooldownMax; ctx.fillStyle = gaugeColor; ctx.fillRect(gaugeX, gaugeY, gaugeWidth * progress, gaugeHeight); }
+
+            ctx.fillStyle = '#fff'; ctx.font = '24px Arial'; ctx.textAlign = 'left'; ctx.fillText(`Score: ${score}`, 10, 30);
+            ctx.textAlign = 'right'; ctx.fillText(`Time: ${timeLeft}`, GAME_WIDTH - 10, 30);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(GAME_WIDTH / 2 - 100, 10, 200, 10);
+            ctx.fillStyle = '#f1c40f';
+
+            // ★★★ ここからが【ボス戦対応】の新ゲージロジックです ★★★
+            let gaugeWidth = 0;
+            // ボス戦中はゲージをMAXで固定表示する
+            if (bossFightActive) {
+                gaugeWidth = 200;
+            }
+            // 通常時は、最後にボスを倒したスコアからの差分でゲージを計算する
+            else {
+                const progressSinceLastBoss = score - scoreAtLastBossDefeat;
+                const progressRatio = progressSinceLastBoss / BOSS_SPAWN_SCORE_INTERVAL;
+                // スコアが下がった場合などにゲージがマイナスにならないようにMath.maxを使用
+                gaugeWidth = Math.min(200, Math.max(0, progressRatio) * 200);
+            }
+            ctx.fillRect(GAME_WIDTH / 2 - 100, 10, gaugeWidth, 10);
+
+            if (gameOver) { const gameOverText = document.getElementById('game-over-text'); const tweetLink = document.getElementById('tweet-link'); gameOverText.innerHTML = ` <div style="font-size: 50px;">GAME OVER</div> <div style="font-size: 20px;">Final Score: ${score}</div> <div style="font-size: 16px; margin-top: 10px;">クリック・タップでリスタート</div> `; const tweetText = `「セルランナー」で${score}点を記録しました！ #セルランナー`; const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`; tweetLink.href = tweetUrl; gameOverScreen.style.display = 'flex'; }
+        }
+        function gameLoop() {
+            update();
+            draw();
+            if (!gameOver) requestAnimationFrame(gameLoop);
+        }
+
+        function resizeGameCanvas() {
+            const mainContent = document.querySelector('.main-content');
+            const legend = document.getElementById('legend');
+            const gameWrapper = document.querySelector('.game-wrapper');
+
+            // 利用可能な描画エリアの幅を取得 (左右のpaddingを考慮)
+            const availableWidth = mainContent.clientWidth - 40;
+
+            // 利用可能な描画エリアの高さを取得
+            let availableHeight = mainContent.clientHeight - 40; // 上下のpadding
+
+            // 凡例が表示されている場合は、その分の高さを引く
+            if (window.getComputedStyle(legend).display !== 'none') {
+                availableHeight -= (legend.offsetHeight + 20); // 凡例の高さとgap
+            }
+
+            // ゲームの元々の比率 (800 / 600)
+            const aspectRatio = GAME_WIDTH / GAME_HEIGHT;
+
+            let newWidth = availableWidth;
+            let newHeight = newWidth / aspectRatio;
+
+            // 計算した結果、高さが利用可能領域をはみ出る場合は、
+            // 高さを基準に幅を再計算する
+            if (newHeight > availableHeight) {
+                newHeight = availableHeight;
+                newWidth = newHeight * aspectRatio;
+            }
+
+            // 計算したサイズをゲームのラッパーに適用
+            gameWrapper.style.width = newWidth + 'px';
+            gameWrapper.style.height = newHeight + 'px';
+        } window.addEventListener('DOMContentLoaded', resizeGameCanvas);
+        window.addEventListener('resize', resizeGameCanvas);
+
+        initializeGame();
+    </script>
+</body>
+
+</html>
