@@ -1828,7 +1828,6 @@ function analyzeAndApplyImage(source, applyToPlayer = true) { // ★★★ 引�
                     }
                 } catch (error) {
                     alert('エラー: ファイルの読み込みに失敗しました。');
-                    console.error("Pixel art loading error:", error);
                 }
             };
             reader.readAsText(file);
@@ -1906,7 +1905,6 @@ function analyzeAndApplyImage(source, applyToPlayer = true) { // ★★★ 引�
                     }
                 } catch (error) {
                     alert('エラー: ファイルの読み込みに失敗しました。');
-                    console.error("Beat loading error:", error);
                 }
             };
             reader.readAsText(file);
@@ -2231,15 +2229,6 @@ function analyzeAndApplyImage(source, applyToPlayer = true) { // ★★★ 引�
         function saveCharacterToSlot(slotIndex) {
             initAudio();
             const charData = createCharacterData();
-
-            // ★★★ ここにconsole.logを追加 ★★★
-            console.log(`--- スロット${slotIndex + 1}へ保存 ---`);
-            console.log("保存されるキャラクター情報:", charData);
-            if (charData) { // データがnullでないことを確認
-                console.log(`保存される能力: ${charData.colorAbility}`);
-            }
-            // ★★★ ここまで ★★★
-
             if (!charData) { alert("描画エリアに何も描かれていません。"); return; }
             player.characterSlots[slotIndex] = charData;
             const slotElement = document.getElementById(`slot-${slotIndex + 1}`);
@@ -2252,12 +2241,7 @@ function analyzeAndApplyImage(source, applyToPlayer = true) { // ★★★ 引�
         function switchCharacter(slotIndex) {
             if (gameOver || player.isTrading || player.isHelpOpen || !player.characterSlots[slotIndex]) return;
 
-            // ★★★ ここからconsole.logを追加 ★★★
             const newChar = player.characterSlots[slotIndex];
-            console.log(`--- キャラクター変身: スロット${slotIndex + 1} ---`);
-            console.log("変身先のキャラクター情報:", newChar); // オブジェクト全体を確認
-            console.log(`読み込まれた能力: ${newChar.colorAbility}`); // ★最重要: 能力を確認
-            // ★★★ ここまで ★★★
 
             const oldHeight = player.height;
             Object.assign(player, {
