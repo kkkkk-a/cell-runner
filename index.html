@@ -64,7 +64,7 @@
             justify-content: center;
             min-width: 0;
             padding: 20px;
-            gap: 20px;
+            gap: 10px;
             box-sizing: border-box;
         }
 
@@ -256,15 +256,13 @@
         }
 
         #inventory {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
             display: flex;
             gap: 15px;
-            background-color: rgba(0, 0, 0, 0.4);
-            padding: 8px;
-            border-radius: 5px;
+            background-color: #2c3e50;   /* ★★★ 背景色を凡例と統一 ★★★ */
+            border-radius: 8px;        /* ★★★ 角丸を調整 ★★★ */
+            border: 2px solid #000;    /* ★★★ 枠線を追加して統一感を出す ★★★ */
+            width: auto;               /* ★★★ 幅を自動に設定 ★★★ */
+            max-width: 95%;            /* ★★★ はみ出さないように最大幅を指定 ★★★ */
         }
 
         .item-display {
@@ -687,7 +685,7 @@
         /* --- キャラクタースロット --- */
 #char-slots {
     position: absolute;
-    bottom: 0; /* ゲーム画面の下から10pxの位置に */
+    bottom: 4px; /* ゲーム画面の下から10pxの位置に */
     left: 4px;
     pointer-events: auto; /* ★★★ クリックできるように必ず指定 ★★★ */
     z-index: 10; /* 他のUIより手前に */
@@ -784,19 +782,20 @@
 
         <!-- === 中央パネル (ゲーム画面 & オブジェクト説明) === -->
         <div class="main-content">
+                        <div id="inventory">
+                <div class="item-display"><span class="item-icon">🛡️</span><span id="shield-rescues-count">0</span>
+                </div>
+                <div class="item-display"><span class="item-icon">🕊️</span><span id="fall-rescues-count">0</span>
+                </div>
+                <div class="item-display"><span class="item-icon">🪶</span><span id="double-jumps-count">0</span>
+                </div>
+                <div class="item-display"><span class="item-icon">⏳</span><span id="time-stops-count">0</span></div>
+                <div class="item-display"><span class="item-icon">🔥</span><span id="power-ups-count">0</span></div>
+            </div>
             <div class="game-wrapper">
                 <canvas id="gameCanvas"></canvas>
 
-                <div id="inventory">
-                    <div class="item-display"><span class="item-icon">🛡️</span><span id="shield-rescues-count">0</span>
-                    </div>
-                    <div class="item-display"><span class="item-icon">🕊️</span><span id="fall-rescues-count">0</span>
-                    </div>
-                    <div class="item-display"><span class="item-icon">🪶</span><span id="double-jumps-count">0</span>
-                    </div>
-                    <div class="item-display"><span class="item-icon">⏳</span><span id="time-stops-count">0</span></div>
-                    <div class="item-display"><span class="item-icon">🔥</span><span id="power-ups-count">0</span></div>
-                </div>
+
 
                 <div id="game-over-screen">
                     <div id="game-over-text"></div>
@@ -923,6 +922,7 @@
             <h3>操作のヒント</h3>
             <p>・画面の中央にあるラインより上を移動すると、追い風に乗って<strong>移動スピードが大幅にアップ</strong>します。これを利用して一気に距離を稼いだり、危険な場所を素早く突破したりできます。</p>
             <h3>アイテム一覧</h3>
+
             <ul>
                 <li><strong>🛡️ 無敵シールド:</strong> 敵の攻撃や棘から一度だけ身を守ります。</li>
                 <li><strong>🕊️ 空中復帰:</strong> ステージから落下してしまった時に一度だけ助かります。</li>
